@@ -15,15 +15,14 @@ def main():
         "stop_loss": -0.5,
         "take_profit": 1.2,
         "sleep": 1,
-        "symbols": ["TESTEUSDT"],
+        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT"],
     }
 
-    broker = VirtualBroker()
+    broker = VirtualBroker(config["symbols"])
+    world = World(config["symbols"])
     decision = DecisionEngine(config)
     risk = RiskManager(config)
     engine = Engine(broker, decision, risk)
-
-    world = World(config["symbols"])
 
     engine.boot()
     engine.state.set(State.IDLE)
