@@ -1,7 +1,6 @@
 import time
 
 from core.engine import Engine
-from core.state_machine import State
 from core.decision import DecisionEngine
 from core.risk import RiskManager
 from core.world import World
@@ -18,24 +17,20 @@ def main():
         "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
     }
 
-    broker = VirtualBroker()
+    broker = VirtualBroker(config["symbols"])
     decision = DecisionEngine(config)
     risk = RiskManager(config)
-    engine = Engine(broker, decision, risk)
+
     world = World(config["symbols"])
+    engine = Engine(broker, decision, risk, config["symbols"])
 
     engine.boot()
-    engine.state.set(State.IDLE)
 
     while True:
         try:
-            # Broker gera feed multi-ativo
-            feed = broker.tick(config["symbols"])
-
-            # Mundo absorve o feed
+            feed = broker.tick()  # { "BTCUSDT": price, ... }
             world.update(feed)
 
-            # Engine pensa sobre o mundo
             engine.tick(world.snapshot())
 
             time.sleep(config["sleep"])
