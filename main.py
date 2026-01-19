@@ -1,8 +1,7 @@
-# main.py
-
 import time
 
 from core.engine import Engine
+from core.state_machine import State
 from core.decision import DecisionEngine
 from core.risk import RiskManager
 from core.world import World
@@ -23,22 +22,16 @@ def main():
     decision = DecisionEngine(config)
     risk = RiskManager(config)
     engine = Engine(broker, decision, risk)
-
     world = World(config["symbols"])
 
     engine.boot()
+    engine.state.set(State.IDLE)
 
     while True:
         try:
-            price = broker.tick()
-
-            feed = {
-                "TESTEUSDT": {
-                    "price": price,
-                }
-            }
-
+            feed = broker.tick()
             world.update(feed)
+
             engine.tick(world.snapshot())
 
             time.sleep(config["sleep"])
