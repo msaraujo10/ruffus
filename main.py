@@ -1,13 +1,15 @@
 import time
 
 from core.engine import Engine
+from core.decision import DecisionEngine
+from core.risk import RiskManager
+from core.state_machine import State
 from adapters.virtual import VirtualBroker
 
 
 def main():
     print("🧠 RUFFUS — V2 ESTÁVEL (MODO VIRTUAL)")
 
-    # Configuração mínima inline (depois vira arquivo)
     config = {
         "stop_loss": -0.5,
         "take_profit": 1.2,
@@ -15,7 +17,11 @@ def main():
     }
 
     broker = VirtualBroker()
-    engine = Engine(broker, config)
+    decision = DecisionEngine(config)
+    risk = RiskManager(config)
+
+    engine = Engine(broker, decision, risk)
+    engine.state.set(State.IDLE)
 
     while True:
         try:
@@ -23,6 +29,7 @@ def main():
 
             market = {
                 "price": price,
+                "symbol": "TESTE",
             }
 
             engine.tick(market)
