@@ -1,50 +1,53 @@
-import time
-from core.state_machine import StateMachine
-from core.decision import DecisionEngine
-from core.risk import RiskManager
+from core.state_machine import State, StateMachine
 
 
 class Engine:
-    def __init__(self, broker, config):
-        self.broker = broker
-        self.config = config
+    """
+    Orquestrador central.
+    Nenhuma regra de mercado aqui.
+    Nenhuma regra de API aqui.
+    """
 
+    def __init__(self, broker, decision, risk):
+        self.broker = broker
+        self.decision = decision
+        self.risk = risk
         self.state = StateMachine()
-        self.decision = DecisionEngine(config)
-        self.risk = RiskManager(config)
+
+    def boot(self):
+        self.state.set(State.SYNC)
 
     def tick(self, market_data):
-        """
-        Um ciclo completo do robô.
-        """
-        current_state = self.state.current()
+        current = self.state.current()
 
-        action = self.decision.decide(
-            state=current_state,
-            market=market_data,
-        )
+        # Delegamos a decisão
+        action = self.decision.decide(current, market_data)
 
-        if not self.risk.allow(current_state, action):
-            return  # bloqueado por risco
+        if not action:
+            return
 
-        if action:
-            self.execute(action)
+        # Risco valida
+        if not self.risk.allow(current, action):
+            return
 
-    def execute(self, action):
-        """
-        Executa a ação aprovada.
-        """
+        self.execute(action)
+
+    def execute(self, action: dict):
         kind = action["type"]
 
         if kind == "BUY":
+            self.state.set(State.ENTERING)
             ok = self.broker.buy(action)
             if ok:
-                self.state.set("IN_TRADE")
+                self.state.set(State.IN_POSITION)
+            else:
+                self.state.set(State.ERROR)
 
         elif kind == "SELL":
+            self.state.set(State.EXITING)
             ok = self.broker.sell(action)
             if ok:
-                self.state.set("IDLE")
-
-        # informa ao RiskManager que algo ocorreu
-        self.risk.on_executed(action)
+                self.state.set(State.POST_TRADE)
+                self.state.set(State.IDLE)
+            else:
+                self.state.set(State.ERROR)
