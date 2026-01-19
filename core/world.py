@@ -1,29 +1,24 @@
 class World:
     """
-    Representa o mundo sincronizado.
-    Mantém o estado de múltiplos símbolos.
+    Representa o mundo observado pelo robô.
+    Guarda o estado atual de cada símbolo.
     """
 
     def __init__(self, symbols: list[str]):
         self.symbols = symbols
-        self.prices: dict[str, float] = {}
+        self.state = {s: {"price": None} for s in symbols}
 
-    def update(self, feed: dict):
+    def update(self, feed):
         """
-        Recebe um feed do broker:
-        {
-            "BTCUSDT": 43210.5,
-            "ETHUSDT": 2345.1,
-            ...
-        }
+        Recebe dados brutos do broker.
+        No modo virtual atual, `feed` é apenas um float.
         """
-        for symbol, price in feed.items():
-            self.prices[symbol] = price
+        # Por enquanto só temos 1 símbolo virtual
+        symbol = self.symbols[0]
+        self.state[symbol]["price"] = feed
 
     def snapshot(self) -> dict:
         """
-        Retorna o estado atual do mundo.
+        Retorna uma cópia do mundo para decisão.
         """
-        return {
-            "prices": dict(self.prices),
-        }
+        return {k: v.copy() for k, v in self.state.items()}
