@@ -22,6 +22,7 @@ def main():
     decision = DecisionEngine(config)
     risk = RiskManager(config)
     engine = Engine(broker, decision, risk)
+
     world = World(config["symbols"])
 
     engine.boot()

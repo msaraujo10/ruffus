@@ -1,32 +1,56 @@
 class World:
     """
-    Representa o estado sincronizado do mercado.
-    No futuro, unirá:
-    - preços
-    - volumes
-    - candles
-    - posição atual
+    Representa a realidade observável do robô.
+    Aqui vivem:
+    - preço atual
+    - símbolo atual
+    - estado da posição
+    - preço de entrada
+    - preço máximo desde a entrada
     """
 
     def __init__(self, symbols: list[str]):
         self.symbols = symbols
-        self.market = {s: {"price": None} for s in symbols}
+
+        self.price = None
+        self.symbol = None
+
+        self.in_position = False
+        self.entry_price = None
+        self.max_price = None
 
     def update(self, feed: dict):
         """
-        Recebe dados do broker e atualiza o mundo.
-        Exemplo de feed:
-        {
-            "BTCUSDT": {"price": 64123.5},
-            "ETHUSDT": {"price": 3120.4}
-        }
+        Atualiza o mundo a partir do broker.
+        feed = {"price": float, "symbol": str}
         """
-        for symbol, data in feed.items():
-            if symbol in self.market:
-                self.market[symbol].update(data)
+        self.price = feed["price"]
+        self.symbol = feed["symbol"]
+
+        if self.in_position:
+            if self.max_price is None:
+                self.max_price = self.price
+            else:
+                self.max_price = max(self.max_price, self.price)
+
+    def on_buy(self, price: float):
+        self.in_position = True
+        self.entry_price = price
+        self.max_price = price
+
+    def on_sell(self):
+        self.in_position = False
+        self.entry_price = None
+        self.max_price = None
 
     def snapshot(self) -> dict:
         """
-        Retorna uma fotografia imutável do mundo atual.
+        Visão atual do mundo para o cérebro.
         """
-        return {symbol: data.copy() for symbol, data in self.market.items()}
+        return {
+            "price": self.price,
+            "symbol": self.symbol,
+            "in_position": self.in_position,
+            "entry_price": self.entry_price,
+            "max_price": self.max_price,
+        }

@@ -1,3 +1,5 @@
+# core/engine.py
+
 from core.state_machine import State, StateMachine
 
 
@@ -18,16 +20,12 @@ class Engine:
         self.state.set(State.SYNC)
 
     def tick(self, market_data):
-        self.state.update()
         current = self.state.current()
 
-        # Delegamos a decisão
         action = self.decision.decide(current, market_data)
-
         if not action:
             return
 
-        # Risco valida
         if not self.risk.allow(current, action):
             return
 
