@@ -3,67 +3,85 @@ from core.state_machine import State
 
 class DecisionEngine:
     """
-    Cérebro do robô.
-    Multi-ativo.
-    Decide em qual símbolo entrar e quando sair.
+    Cérebro multi-ativo do robô.
+
+    Ele:
+    - decide entradas por símbolo
+    - acompanha preços de entrada por símbolo
+    - gera ações BUY / SELL independentes
     """
 
     def __init__(self, config: dict):
         self.config = config
-        self.current_symbol = None
-        self.entry_price = None
+
+        # memória por ativo
+        # ex: { "BTCUSDT": 1.0023, "ETHUSDT": 0.9981 }
+        self.entries: dict[str, float] = {}
 
     def decide(self, state: State, world: dict):
         """
         world = {
-            "BTCUSDT": {"price": 0.99},
-            "ETHUSDT": {"price": 1.01},
-            ...
+            "prices": {
+                "BTCUSDT": 1.0023,
+                "ETHUSDT": 0.9981,
+            }
         }
+
+        Retorna:
+            None
+            ou
+            {"type": "BUY" / "SELL", "symbol": "...", "price": ...}
         """
 
-        # Procurar entrada
-        if state == State.IDLE:
-            for symbol, data in world.items():
-                price = data["price"]
+        prices = world["prices"]
 
-                if self.should_enter(symbol, data):
-                    self.current_symbol = symbol
-                    self.entry_price = price
+        # Se não estamos em posição, procurar entrada
+        if state == State.IDLE:
+            for symbol, price in prices.items():
+                if price is None:
+                    continue
+
+                if self.should_enter(symbol, price):
+                    self.entries[symbol] = price
                     return {
                         "type": "BUY",
                         "symbol": symbol,
                         "price": price,
                     }
 
-        # Gerenciar posição
-        if state == State.IN_POSITION and self.current_symbol:
-            data = world[self.current_symbol]
-            price = data["price"]
+        # Se estamos em posição, gerenciar saída
+        if state == State.IN_POSITION:
+            for symbol, entry in list(self.entries.items()):
+                price = prices.get(symbol)
+                if price is None:
+                    continue
 
-            change = ((price - self.entry_price) / self.entry_price) * 100
+                change = ((price - entry) / entry) * 100
 
-            if change <= self.config["stop_loss"]:
-                return {
-                    "type": "SELL",
-                    "symbol": self.current_symbol,
-                    "price": price,
-                    "reason": "STOP",
-                }
+                if change <= self.config["stop_loss"]:
+                    self.entries.pop(symbol, None)
+                    return {
+                        "type": "SELL",
+                        "symbol": symbol,
+                        "price": price,
+                        "reason": "STOP",
+                    }
 
-            if change >= self.config["take_profit"]:
-                return {
-                    "type": "SELL",
-                    "symbol": self.current_symbol,
-                    "price": price,
-                    "reason": "PROFIT",
-                }
+                if change >= self.config["take_profit"]:
+                    self.entries.pop(symbol, None)
+                    return {
+                        "type": "SELL",
+                        "symbol": symbol,
+                        "price": price,
+                        "reason": "PROFIT",
+                    }
 
         return None
 
-    def should_enter(self, symbol: str, data: dict) -> bool:
+    def should_enter(self, symbol: str, price: float) -> bool:
         """
-        Aqui entram os filtros reais no futuro.
-        Por enquanto, sempre permite.
+        Filtro de entrada.
+        Por enquanto: sempre True.
+        Depois: volume, tendência, candle, etc.
         """
         return True
