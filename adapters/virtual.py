@@ -1,33 +1,37 @@
+# adapters/virtual.py
+
 import random
-import time
 
 
 class VirtualBroker:
     """
     Simula uma exchange.
-    Não há dinheiro real aqui.
+    Produz um feed de mercado.
     """
 
     def __init__(self):
-        self.price = 1.0
-        self.entry_price = None
+        self.prices = {
+            "TESTEUSDT": 1.0,
+        }
 
     def tick(self):
-        """
-        Simula movimento de mercado.
-        """
-        drift = random.uniform(-0.005, 0.008)
-        self.price *= 1 + drift
-        return self.price
+        feed = {}
+
+        for symbol, price in self.prices.items():
+            drift = random.uniform(-0.005, 0.008)
+            new_price = price * (1 + drift)
+            self.prices[symbol] = new_price
+
+            feed[symbol] = {"price": round(new_price, 5)}
+
+        return feed
 
     def buy(self, action: dict) -> bool:
-        self.entry_price = self.price
-        print(f"🚀 COMPRA @ {self.price:.4f}")
+        print(f"🚀 COMPRA {action['symbol']} @ {action['price']:.5f}")
         return True
 
     def sell(self, action: dict) -> bool:
-        if self.entry_price:
-            profit = ((self.price - self.entry_price) / self.entry_price) * 100
-            print(f"🏁 VENDA @ {self.price:.4f} | {profit:.2f}%")
-            self.entry_price = None
+        print(
+            f"🏁 VENDA {action['symbol']} @ {action['price']:.5f} | {action.get('reason', '')}"
+        )
         return True
