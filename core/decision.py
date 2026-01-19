@@ -1,44 +1,63 @@
+from core.state_machine import State
+
+
 class DecisionEngine:
-    def __init__(self, config):
+    """
+    Cérebro do robô.
+    Só decide. Não executa.
+    """
+
+    def __init__(self, config: dict):
         self.config = config
 
-    # Chamado quando o sistema está em IDLE
-    def when_idle(self, world):
-        """
-        Retorna uma ação ou None.
-        Exemplo de retorno:
-        {
-            "type": "BUY",
-            "symbol": "BTCUSDT",
-            "price": 43210.5
-        }
-        """
+        # memória interna simples
+        self.entry_price = None
 
-        # Por enquanto é apenas um esqueleto:
-        # futuramente aqui entram:
-        # - leitura de mercado
-        # - filtros
-        # - indicadores
-        # - ranking de ativos
+    def decide(self, state: State, market: dict):
+        price = market["price"]
+
+        # Estado ocioso: procurar entrada
+        if state == State.IDLE:
+            if self.should_enter(market):
+                self.entry_price = price
+                return {
+                    "type": "BUY",
+                    "symbol": market["symbol"],
+                    "price": price,
+                }
+
+        # Estado em posição: gerenciar saída
+        if state == State.IN_POSITION:
+            if self.entry_price is None:
+                return None
+
+            change = ((price - self.entry_price) / self.entry_price) * 100
+
+            if change <= self.config["stop_loss"]:
+                return {
+                    "type": "SELL",
+                    "symbol": market["symbol"],
+                    "price": price,
+                    "reason": "STOP",
+                }
+
+            if change >= self.config["take_profit"]:
+                return {
+                    "type": "SELL",
+                    "symbol": market["symbol"],
+                    "price": price,
+                    "reason": "PROFIT",
+                }
 
         return None
 
-    # Chamado quando o sistema está em IN_TRADE
-    def when_in_trade(self, world):
+    def should_enter(self, market: dict) -> bool:
         """
-        Retorna uma ação ou None.
-        Exemplo de retorno:
-        {
-            "type": "SELL",
-            "reason": "TAKE_PROFIT",
-            "cooldown": 90
-        }
+        Por enquanto:
+        - sempre permite entrada
+        No futuro:
+        - filtros técnicos
+        - volume
+        - tendência
         """
-
-        # Aqui futuramente entram:
-        # - cálculo de lucro
-        # - stop
-        # - trailing
-        # - escudo
-
-        return None
+        return True
