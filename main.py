@@ -30,14 +30,16 @@ def main():
 
     while True:
         try:
-            feed = broker.tick()
-            # feed deve ser algo como:
-            # {"TESTEUSDT": {"price": 1.0123}}
+            price = broker.tick()
+
+            feed = {
+                "TESTEUSDT": {
+                    "price": price,
+                }
+            }
 
             world.update(feed)
-            snapshot = world.snapshot()
-
-            engine.tick(snapshot)
+            engine.tick(world.snapshot())
 
             time.sleep(config["sleep"])
 
