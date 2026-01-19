@@ -1,9 +1,11 @@
+# main.py
+
 import time
 
 from core.engine import Engine
 from core.decision import DecisionEngine
 from core.risk import RiskManager
-from core.state_machine import State
+from core.world import World
 from adapters.virtual import VirtualBroker
 
 
@@ -14,25 +16,28 @@ def main():
         "stop_loss": -0.5,
         "take_profit": 1.2,
         "sleep": 1,
+        "symbols": ["TESTEUSDT"],
     }
 
     broker = VirtualBroker()
     decision = DecisionEngine(config)
     risk = RiskManager(config)
-
     engine = Engine(broker, decision, risk)
-    engine.state.set(State.IDLE)
+
+    world = World(config["symbols"])
+
+    engine.boot()
 
     while True:
         try:
-            price = broker.tick()
+            feed = broker.tick()
+            # feed deve ser algo como:
+            # {"TESTEUSDT": {"price": 1.0123}}
 
-            market = {
-                "price": price,
-                "symbol": "TESTE",
-            }
+            world.update(feed)
+            snapshot = world.snapshot()
 
-            engine.tick(market)
+            engine.tick(snapshot)
 
             time.sleep(config["sleep"])
 
