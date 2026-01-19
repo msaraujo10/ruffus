@@ -6,6 +6,7 @@ from core.decision import DecisionEngine
 from core.risk import RiskManager
 from brokers.virtual import VirtualBroker
 
+# --- Main Execution ---
 
 def main():
     print("🧠 RUFFUS — V2 ESTÁVEL (MODO VIRTUAL)")
