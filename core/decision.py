@@ -4,23 +4,32 @@ from core.state_machine import State
 class DecisionEngine:
     """
     Cérebro do robô.
-    Agora opera sobre um mundo multi-ativo.
+    Multi-ativo.
+    Decide em qual símbolo entrar e quando sair.
     """
 
     def __init__(self, config: dict):
         self.config = config
-        self.entry = None  # {"symbol": str, "price": float}
+        self.current_symbol = None
+        self.entry_price = None
 
     def decide(self, state: State, world: dict):
-        # world = {"BTCUSDT": {"price": 1.002}, "ETHUSDT": {"price": 0.998}, ...}
+        """
+        world = {
+            "BTCUSDT": {"price": 0.99},
+            "ETHUSDT": {"price": 1.01},
+            ...
+        }
+        """
 
         # Procurar entrada
         if state == State.IDLE:
             for symbol, data in world.items():
                 price = data["price"]
 
-                if self.should_enter(symbol, price):
-                    self.entry = {"symbol": symbol, "price": price}
+                if self.should_enter(symbol, data):
+                    self.current_symbol = symbol
+                    self.entry_price = price
                     return {
                         "type": "BUY",
                         "symbol": symbol,
@@ -28,17 +37,16 @@ class DecisionEngine:
                     }
 
         # Gerenciar posição
-        if state == State.IN_POSITION and self.entry:
-            symbol = self.entry["symbol"]
-            entry_price = self.entry["price"]
+        if state == State.IN_POSITION and self.current_symbol:
+            data = world[self.current_symbol]
+            price = data["price"]
 
-            price = world[symbol]["price"]
-            change = ((price - entry_price) / entry_price) * 100
+            change = ((price - self.entry_price) / self.entry_price) * 100
 
             if change <= self.config["stop_loss"]:
                 return {
                     "type": "SELL",
-                    "symbol": symbol,
+                    "symbol": self.current_symbol,
                     "price": price,
                     "reason": "STOP",
                 }
@@ -46,13 +54,16 @@ class DecisionEngine:
             if change >= self.config["take_profit"]:
                 return {
                     "type": "SELL",
-                    "symbol": symbol,
+                    "symbol": self.current_symbol,
                     "price": price,
                     "reason": "PROFIT",
                 }
 
         return None
 
-    def should_enter(self, symbol: str, price: float) -> bool:
-        # Por enquanto: sempre permite
+    def should_enter(self, symbol: str, data: dict) -> bool:
+        """
+        Aqui entram os filtros reais no futuro.
+        Por enquanto, sempre permite.
+        """
         return True
