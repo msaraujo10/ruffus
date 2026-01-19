@@ -1,0 +1,18 @@
+{
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "ADAUSDT",
+    "MATICUSDT",
+    "LTCUSDT",
+    "XRPUSDT",
+    "DOTUSDT",
+    "AVAXUSDT",
+    "LINKUSDT"
+  ],
+  "valor_trade": 5.0,
+  "stop_loss": -0.5,
+  "take_profit": 1.2,
+  "sleep": 5
+}
