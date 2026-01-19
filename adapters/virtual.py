@@ -3,44 +3,51 @@ import random
 
 class VirtualBroker:
     """
-    Simula uma exchange multi-ativo.
+    Broker virtual multi-ativo.
+    Simula uma exchange real.
     """
 
-    def __init__(self, symbols: list[str]):
-        self.symbols = symbols
-        self.prices = {s: 1.0 for s in symbols}
-        self.entry = None  # (symbol, price)
+    def __init__(self):
+        # preços por símbolo
+        self.prices: dict[str, float] = {}
 
-    def tick(self) -> dict:
+        # preço de entrada por símbolo
+        self.entries: dict[str, float] = {}
+
+    def tick(self, symbols: list[str]) -> dict:
         """
-        Retorna um feed multi-ativo:
+        Gera um feed multi-ativo:
         {
-            "BTCUSDT": 1.002,
-            "ETHUSDT": 0.998,
+            "BTCUSDT": 1.0023,
+            "ETHUSDT": 0.9981,
             ...
         }
         """
         feed = {}
 
-        for s in self.symbols:
+        for s in symbols:
+            if s not in self.prices:
+                self.prices[s] = 1.0
+
             drift = random.uniform(-0.005, 0.008)
             self.prices[s] *= 1 + drift
-            feed[s] = round(self.prices[s], 5)
+            feed[s] = round(self.prices[s], 6)
 
         return feed
 
-    def buy(self, action: dict) -> bool:
-        symbol = action["symbol"]
+    def buy(self, symbol: str, action: dict) -> bool:
         price = action["price"]
-        self.entry = (symbol, price)
+        self.entries[symbol] = price
         print(f"🚀 COMPRA {symbol} @ {price}")
         return True
 
-    def sell(self, action: dict) -> bool:
-        if self.entry:
-            symbol, entry_price = self.entry
-            price = action["price"]
-            profit = ((price - entry_price) / entry_price) * 100
+    def sell(self, symbol: str, action: dict) -> bool:
+        price = action["price"]
+        entry = self.entries.get(symbol)
+
+        if entry:
+            profit = ((price - entry) / entry) * 100
             print(f"🏁 VENDA {symbol} @ {price} | {profit:.2f}%")
-            self.entry = None
+            self.entries.pop(symbol, None)
+
         return True

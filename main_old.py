@@ -1,41 +1,37 @@
 import time
 
-from core.engine import Engine
+from core.engine_old import Engine
 from core.state_machine import State
-from core.decision import DecisionEngine
+from core.decision_old import DecisionEngine
 from core.risk import RiskManager
-from core.world import World
-from adapters.virtual import VirtualBroker
+from core.world_old import World
+from adapters.virtual_old import VirtualBroker
 
 
 def main():
-    print("🧠 RUFFUS — V2 ESTÁVEL (MODO VIRTUAL | MULTI-ATIVO)")
+    print("🧠 RUFFUS — V2 ESTÁVEL (MODO VIRTUAL)")
 
     config = {
         "stop_loss": -0.5,
         "take_profit": 1.2,
         "sleep": 1,
-        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT"],
     }
 
-    broker = VirtualBroker()
+    broker = VirtualBroker(config["symbols"])
+    world = World(config["symbols"])
     decision = DecisionEngine(config)
     risk = RiskManager(config)
     engine = Engine(broker, decision, risk)
-    world = World(config["symbols"])
 
     engine.boot()
     engine.state.set(State.IDLE)
 
     while True:
         try:
-            # Broker gera feed multi-ativo
-            feed = broker.tick(config["symbols"])
-
-            # Mundo absorve o feed
+            feed = broker.tick()
             world.update(feed)
 
-            # Engine pensa sobre o mundo
             engine.tick(world.snapshot())
 
             time.sleep(config["sleep"])

@@ -1,12 +1,13 @@
+# core/engine.py
+
 from core.state_machine import State, StateMachine
 
 
 class Engine:
     """
     Orquestrador central.
-    Não conhece regras de mercado.
-    Não conhece API.
-    Apenas coordena estados e ações.
+    Nenhuma regra de mercado aqui.
+    Nenhuma regra de API aqui.
     """
 
     def __init__(self, broker, decision, risk):
@@ -17,16 +18,11 @@ class Engine:
 
     def boot(self):
         self.state.set(State.SYNC)
-        self.state.set(State.IDLE)
 
-    def tick(self, world: dict):
-        """
-        Um ciclo completo do robô.
-        """
+    def tick(self, market_data):
         current = self.state.current()
 
-        action = self.decision.decide(current, world)
-
+        action = self.decision.decide(current, market_data)
         if not action:
             return
 
@@ -37,11 +33,10 @@ class Engine:
 
     def execute(self, action: dict):
         kind = action["type"]
-        symbol = action["symbol"]
 
         if kind == "BUY":
             self.state.set(State.ENTERING)
-            ok = self.broker.buy(symbol, action)
+            ok = self.broker.buy(action)
             if ok:
                 self.state.set(State.IN_POSITION)
             else:
@@ -49,7 +44,7 @@ class Engine:
 
         elif kind == "SELL":
             self.state.set(State.EXITING)
-            ok = self.broker.sell(symbol, action)
+            ok = self.broker.sell(action)
             if ok:
                 self.state.set(State.POST_TRADE)
                 self.state.set(State.IDLE)
