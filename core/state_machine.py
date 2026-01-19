@@ -1,3 +1,4 @@
+import time
 from enum import Enum, auto
 
 
@@ -18,8 +19,10 @@ class StateMachine:
     Nenhuma ação acontece fora de um estado válido.
     """
 
-    def __init__(self):
+    def __init__(self, cooldown: int = 5):
         self._state = State.BOOT
+        self._entered_at = time.time()
+        self.cooldown = cooldown
 
     def current(self) -> State:
         return self._state
@@ -31,6 +34,17 @@ class StateMachine:
         # Log simples e explícito
         print(f"🔁 STATE: {self._state.name} → {new_state.name}")
         self._state = new_state
+        self._entered_at = time.time()
+
+    def update(self):
+        """
+        Chamado a cada tick.
+        Controla transições automáticas.
+        """
+        if self._state == State.POST_TRADE:
+            elapsed = time.time() - self._entered_at
+            if elapsed >= self.cooldown:
+                self.set(State.IDLE)
 
     def is_idle(self) -> bool:
         return self._state == State.IDLE

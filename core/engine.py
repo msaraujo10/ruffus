@@ -18,6 +18,7 @@ class Engine:
         self.state.set(State.SYNC)
 
     def tick(self, market_data):
+        self.state.update()
         current = self.state.current()
 
         # Delegamos a decisão
