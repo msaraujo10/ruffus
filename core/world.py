@@ -1,44 +1,32 @@
-from state_machine import State, World, DecisionEngine
+class World:
+    """
+    Representa o estado sincronizado do mercado.
+    No futuro, unirá:
+    - preços
+    - volumes
+    - candles
+    - posição atual
+    """
 
-world = World()
-engine = DecisionEngine()
-state = State.BOOT
+    def __init__(self, symbols: list[str]):
+        self.symbols = symbols
+        self.market = {s: {"price": None} for s in symbols}
 
-while True:
-    if state == State.BOOT:
-        print("BOOT")
-        state = State.SYNC
+    def update(self, feed: dict):
+        """
+        Recebe dados do broker e atualiza o mundo.
+        Exemplo de feed:
+        {
+            "BTCUSDT": {"price": 64123.5},
+            "ETHUSDT": {"price": 3120.4}
+        }
+        """
+        for symbol, data in feed.items():
+            if symbol in self.market:
+                self.market[symbol].update(data)
 
-    elif state == State.SYNC:
-        print("SYNC")
-        state = State.IDLE
-
-    elif state == State.IDLE:
-        world.tick()
-        decision = engine.scan(world)
-        if decision:
-            print("Oportunidade detectada")
-            state = State.ENTERING
-
-    elif state == State.ENTERING:
-        print("Entrando em posição")
-        world.has_position = True
-        world.entry_price = world.price
-        world.max_price = world.price
-        state = State.IN_POSITION
-
-    elif state == State.IN_POSITION:
-        world.tick()
-        print(f"Preço: {world.price}")
-        # aqui depois entra stop, escudo, trailing
-        if world.price < world.entry_price * 0.99:
-            state = State.EXITING
-
-    elif state == State.EXITING:
-        print("Saindo da posição")
-        world.has_position = False
-        state = State.POST_TRADE
-
-    elif state == State.POST_TRADE:
-        print("Pós-trade")
-        state = State.IDLE
+    def snapshot(self) -> dict:
+        """
+        Retorna uma fotografia imutável do mundo atual.
+        """
+        return {symbol: data.copy() for symbol, data in self.market.items()}
