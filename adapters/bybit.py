@@ -1,9 +1,16 @@
 from pybit.unified_trading import HTTP
 
 
-class BybitBroker:
-    def __init__(self, symbols, api_key=None, api_secret=None, testnet=False):
+class BybitObserver:
+    """
+    Observador passivo da Bybit.
+    Não compra, não vende.
+    Apenas retorna preços reais no formato esperado pelo World.
+    """
+
+    def __init__(self, symbols, api_key, api_secret, testnet=False):
         self.symbols = symbols
+
         self.session = HTTP(
             testnet=testnet,
             api_key=api_key,
@@ -13,7 +20,7 @@ class BybitBroker:
 
     def tick(self) -> dict:
         """
-        Retorna um snapshot de preços reais da Bybit no formato:
+        Retorna algo como:
         {
             "BTCUSDT": 43210.5,
             "ETHUSDT": 2310.2,
@@ -34,12 +41,6 @@ class BybitBroker:
                     prices[symbol] = float(item["lastPrice"])
 
         except Exception as e:
-            print("⚠ Erro Bybit.tick:", e)
+            print(f"⚠ Erro ao ler preços da Bybit: {e}")
 
         return prices
-
-    def buy(self, action: dict) -> bool:
-        raise NotImplementedError
-
-    def sell(self, action: dict) -> bool:
-        raise NotImplementedError
