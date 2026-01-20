@@ -11,12 +11,11 @@ from adapters.bybit import BybitBroker
 from storage.store_json import JSONStore
 
 
-MODE = "REAL"  # "VIRTUAL" ou "REAL"
+MODE = "OBSERVADOR"  # "VIRTUAL" ou "REAL"
 
 
 def main():
     print(f"🧠 RUFFUS — V2 ESTÁVEL ({MODE})")
-
     config = {
         "stop_loss": -0.5,
         "take_profit": 1.2,
@@ -28,10 +27,21 @@ def main():
     # Escolha do broker
     if MODE == "VIRTUAL":
         broker = VirtualBroker(config["symbols"])
+
     elif MODE == "OBSERVADOR":
-        broker = BybitBroker(config["symbols"])
+        broker = BybitBroker(
+            config["symbols"],
+            mode="OBSERVADOR",
+            armed=False,
+        )
+
     elif MODE == "REAL":
-        broker = BybitBroker(config["symbols"])
+        broker = BybitBroker(
+            config["symbols"],
+            mode="REAL",
+            armed=config.get("armed", False),
+        )
+
     else:
         raise ValueError("MODE inválido")
 

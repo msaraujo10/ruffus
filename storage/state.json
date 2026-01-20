@@ -1,11 +1,11 @@
 {
     "prices": {
-        "BTCUSDT": null,
-        "ETHUSDT": null,
-        "SOLUSDT": null
+        "BTCUSDT": 90080.5,
+        "ETHUSDT": 3005.79,
+        "SOLUSDT": 126.52
     },
     "meta": {
         "version": "2.0",
-        "last_update": "2026-01-20T15:56:00.875374"
+        "last_update": "2026-01-20T16:49:46.554185"
     }
 }
