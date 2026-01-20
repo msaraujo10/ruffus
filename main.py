@@ -11,7 +11,7 @@ from adapters.bybit import BybitBroker
 from storage.store_json import JSONStore
 
 
-MODE = "OBSERVADOR"  # "VIRTUAL" ou "REAL"
+MODE = "REAL"  # "VIRTUAL" ou "REAL"
 
 
 def main():
@@ -29,6 +29,8 @@ def main():
     if MODE == "VIRTUAL":
         broker = VirtualBroker(config["symbols"])
     elif MODE == "OBSERVADOR":
+        broker = BybitBroker(config["symbols"])
+    elif MODE == "REAL":
         broker = BybitBroker(config["symbols"])
     else:
         raise ValueError("MODE inválido")

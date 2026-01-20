@@ -36,10 +36,10 @@ class BybitBroker:
 
         return feed
 
-    def buy(self, action: dict) -> bool:
+    def buy(self, action):
         print(f"[OBSERVADOR] BUY ignorado: {action}")
         return True
 
-    def sell(self, action: dict) -> bool:
+    def sell(self, action):
         print(f"[OBSERVADOR] SELL ignorado: {action}")
         return True
