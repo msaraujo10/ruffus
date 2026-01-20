@@ -26,6 +26,7 @@ class DecisionEngine:
                         "type": "BUY",
                         "symbol": symbol,
                         "price": price,
+                        "reason": "ENTRY",
                     }
 
         # Gerenciar saída
@@ -42,7 +43,7 @@ class DecisionEngine:
                         "type": "SELL",
                         "symbol": symbol,
                         "price": price,
-                        "reason": "STOP",
+                        "reason": "PROFIT",
                     }
 
                 if change >= self.config["take_profit"]:
@@ -64,6 +65,6 @@ class DecisionEngine:
         return {"entries": dict(self.entries)}
 
     def import_state(self, data: dict):
-        entries = data.get("entries")
-        if isinstance(entries, dict):
-            self.entries = {k: float(v) for k, v in entries.items()}
+        if not data:
+            return
+        self.entries = data.get("entries", {})

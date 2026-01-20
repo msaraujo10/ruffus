@@ -12,12 +12,13 @@ class Engine:
     - persistir snapshots consistentes após cada mutação
     """
 
-    def __init__(self, broker, world, decision, risk, store):
+    def __init__(self, broker, world, decision, risk, store, mode: str):
         self.broker = broker
         self.world = world
         self.decision = decision
         self.risk = risk
         self.store = store
+        self.mode = mode
 
         self.state = StateMachine()
 
@@ -25,6 +26,17 @@ class Engine:
     # BOOT
     # -------------------------------------------------
     def boot(self):
+
+        data = self.store.load()
+
+        if data:
+            print("🔄 Restaurando estado persistido.")
+            self.state.import_state({"state": data.get("state")})
+            self.world.import_state(data.get("world"))
+            self.decision.import_state(data.get("decision"))
+        else:
+            self.state.set(State.IDLE)
+
         """
         Inicializa o sistema.
 
@@ -86,28 +98,39 @@ class Engine:
     def execute(self, action: dict):
         kind = action["type"]
 
-        if kind == "BUY":
-            self.state.set(State.ENTERING)
-            ok = self.broker.buy(action)
+        try:
+            if kind == "BUY":
+                self.state.set(State.ENTERING)
+                ok = self.broker.buy(action)
+
+            elif kind == "SELL":
+                self.state.set(State.EXITING)
+                ok = self.broker.sell(action)
+
+            else:
+                return
 
             if ok:
-                self.state.set(State.IN_POSITION)
-                self.persist()
+                status = "EXECUTED"
+                if kind == "BUY":
+                    self.state.set(State.IN_POSITION)
+                else:
+                    self.state.set(State.POST_TRADE)
+                    self.state.set(State.IDLE)
             else:
+                status = "BLOCKED"
                 self.state.set(State.ERROR)
-                self.persist()
 
-        elif kind == "SELL":
-            self.state.set(State.EXITING)
-            ok = self.broker.sell(action)
+        except Exception:
+            status = "ERROR"
+            self.state.set(State.ERROR)
 
-            if ok:
-                self.state.set(State.POST_TRADE)
-                self.state.set(State.IDLE)
-                self.persist()
-            else:
-                self.state.set(State.ERROR)
-                self.persist()
+        # Persistência obrigarória
+        self.store.record_trade(
+            action=action,
+            status=status,
+            mode=self.mode,  # VIRTUAL, OBSERVDOR ou REAL
+        )
 
     # -------------------------------------------------
     # PERSISTÊNCIA CENTRAL

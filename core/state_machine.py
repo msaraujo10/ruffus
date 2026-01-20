@@ -36,6 +36,9 @@ class StateMachine:
         return {"state": self._state.name}
 
     def import_state(self, data: dict):
+        if not data:
+            return
         name = data.get("state")
-        if name and name in State.__members__:
+
+        if name:
             self._state = State[name]

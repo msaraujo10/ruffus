@@ -25,3 +25,23 @@ class JSONStore:
 
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(snapshot, f, indent=4, ensure_ascii=False)
+
+    def record_trade(self, action: dict, status: str, mode: str) -> None:
+        data = self.load() or {}
+
+        trades = data.get("trades", [])
+
+        event = {
+            "symbol": action.get("symbol"),
+            "side": action.get("type"),
+            "price": action.get("price"),
+            "reason": action.get("reason"),
+            "status": status,
+            "mode": mode,
+            "time": datetime.utcnow().isoformat(),
+        }
+
+        trades.append(event)
+        data["trades"] = trades
+
+        self.save(data)
