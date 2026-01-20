@@ -1,18 +1,11 @@
 {
-  "symbols": [
-    "BTCUSDT",
-    "ETHUSDT",
-    "SOLUSDT",
-    "ADAUSDT",
-    "MATICUSDT",
-    "LTCUSDT",
-    "XRPUSDT",
-    "DOTUSDT",
-    "AVAXUSDT",
-    "LINKUSDT"
-  ],
-  "valor_trade": 5.0,
+  "mode": "OBSERVADOR",
+  "armed": false,
   "stop_loss": -0.5,
   "take_profit": 1.2,
-  "sleep": 5
+  "sleep": 1,
+  "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+  "store_path": "storage/state.json",
+  "max_daily_trades": 10,
+  "max_daily_loss": -3.0
 }
