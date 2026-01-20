@@ -32,19 +32,21 @@ class VirtualBroker:
 
         return feed
 
-    def buy(self, symbol: str, action: dict) -> bool:
-        price = self.prices[symbol]
-        self.entries[symbol] = price
-        print(f"🚀 COMPRA {symbol} @ {price:.6f}")
+    def buy(self, action: dict) -> bool:
+        symbol = action["symbol"]
+        price = action["price"]
+
+        print(f"🚀 COMPRA {symbol} @ {price}")
         return True
 
-    def sell(self, symbol: str, action: dict) -> bool:
-        price = self.prices[symbol]
-        entry = self.entries.get(symbol)
+    def sell(self, action: dict) -> bool:
+        symbol = action["symbol"]
+        price = action["price"]
+        profit = action.get("profit")
 
-        if entry:
-            profit = ((price - entry) / entry) * 100
-            print(f"🏁 VENDA {symbol} @ {price:.6f} | {profit:.2f}%")
-            del self.entries[symbol]
+        if profit is not None:
+            print(f"🏁 VENDA {symbol} @ {price} | {profit:.2f}%")
+        else:
+            print(f"🏁 VENDA {symbol} @ {price}")
 
         return True

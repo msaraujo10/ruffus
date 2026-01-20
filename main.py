@@ -1,54 +1,41 @@
 import time
-import json
 
 from core.engine import Engine
+from core.state_machine import State
 from core.decision import DecisionEngine
 from core.risk import RiskManager
 from core.world import World
-from storage.store_json import JSONStore
 
 from adapters.virtual import VirtualBroker
-from adapters.bybit import BybitObserver
+from adapters.bybit import BybitBroker
+from storage.store_json import JSONStore
 
 
-MODE = "VIRTUAL"  # "VIRTUAL" | "REAL_OBSERVER"
+MODE = "VIRTUAL"  # "VIRTUAL" ou "REAL"
 
 
 def main():
     print(f"🧠 RUFFUS — V2 ESTÁVEL ({MODE})")
 
-    with open("config/config.json", "r") as f:
-        config = json.load(f)
+    config = {
+        "stop_loss": -0.5,
+        "take_profit": 1.2,
+        "sleep": 1,
+        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+        "store_path": "storage/state.json",
+    }
 
-    symbols = config["symbols"]
+    # Escolha do broker
+    if MODE == "VIRTUAL":
+        broker = VirtualBroker(config["symbols"])
+    else:
+        broker = BybitBroker(config["symbols"])
 
-    # Persistência
-    store = JSONStore("data/state.json")
-
-    # Domínio
-    world = World(symbols, store)
+    store = JSONStore(config["store_path"])
+    world = World(config["symbols"], store)
     decision = DecisionEngine(config)
     risk = RiskManager(config)
 
-    # Fonte de mercado
-    if MODE == "VIRTUAL":
-        broker = VirtualBroker(symbols)
-
-    elif MODE == "REAL_OBSERVER":
-        with open("config/bybit.json", "r") as f:
-            keys = json.load(f)
-
-        broker = BybitObserver(
-            symbols=symbols,
-            api_key=keys["api_key"],
-            api_secret=keys["api_secret"],
-            testnet=keys.get("testnet", False),
-        )
-
-    else:
-        raise ValueError("MODE inválido")
-
-    # Orquestrador
     engine = Engine(
         broker=broker,
         world=world,
@@ -58,13 +45,17 @@ def main():
     )
 
     engine.boot()
+    engine.state.set(State.IDLE)
 
     while True:
         try:
-            feed = broker.tick()
+            feed = broker.tick()  # { "BTCUSDT": 43210.5, ... }
             world.update(feed)
 
-            engine.tick(world.snapshot())
+            snapshot = world.snapshot()
+            engine.tick(snapshot)
+
+            store.save(snapshot)
 
             time.sleep(config["sleep"])
 
