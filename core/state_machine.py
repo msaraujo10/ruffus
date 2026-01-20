@@ -17,8 +17,7 @@ class StateMachine:
     Máquina de estados por ativo.
     """
 
-    def __init__(self, symbol: str):
-        self.symbol = symbol
+    def __init__(self):
         self._state = State.BOOT
 
     def current(self) -> State:
@@ -28,7 +27,7 @@ class StateMachine:
         if not isinstance(new_state, State):
             raise ValueError("Estado inválido")
 
-        print(f"[{self.symbol}] {self._state.name} → {new_state.name}")
+        print(f"🧠 {self._state.name} -> {new_state.name}")
         self._state = new_state
 
     def is_idle(self) -> bool:

@@ -3,64 +3,56 @@ from core.state_machine import State, StateMachine
 
 class Engine:
     """
-    Orquestrador multi-ativo.
-    Cada símbolo possui sua própria StateMachine.
+    Orquestrador central.
+    Agora totalmente desacoplado do mundo físico.
     """
 
-    def __init__(self, broker, decision, risk, symbols: list[str]):
+    def __init__(self, broker, decision, risk, world):
         self.broker = broker
         self.decision = decision
         self.risk = risk
-
-        # Uma máquina de estados por símbolo
-        self.states: dict[str, StateMachine] = {s: StateMachine(s) for s in symbols}
+        self.world = world
+        self.state = StateMachine()
 
     def boot(self):
-        for sm in self.states.values():
-            sm.set(State.SYNC)
-            sm.set(State.IDLE)
+        self.state.set(State.SYNC)
+        self.state.set(State.IDLE)
 
-    def tick(self, world_snapshot: dict):
-        prices = world_snapshot["prices"]
+    def tick(self, snapshot: dict):
+        current = self.state.current()
 
-        for symbol, sm in self.states.items():
-            state = sm.current()
-            price = prices.get(symbol)
+        action = self.decision.decide(current, snapshot)
 
-            if price is None:
-                continue
+        if not action:
+            return
 
-            market = {
-                "symbol": symbol,
-                "price": price,
-            }
+        if not self.risk.allow(current, action):
+            return
 
-            action = self.decision.decide(state, {"prices": {symbol: price}})
+        self.execute(action)
 
-            if not action:
-                continue
-
-            if not self.risk.allow(state, action):
-                continue
-
-            self.execute(symbol, sm, action)
-
-    def execute(self, symbol: str, sm: StateMachine, action: dict):
+    def execute(self, action: dict):
         kind = action["type"]
+        symbol = action["symbol"]
+        price = action["price"]
 
         if kind == "BUY":
-            sm.set(State.ENTERING)
-            ok = self.broker.buy(symbol, action)
+            self.state.set(State.ENTERING)
+            ok = self.broker.buy(symbol, price)
             if ok:
-                sm.set(State.IN_POSITION)
+                self.world.set_entry(symbol, price)
+                self.world.set_state(symbol, State.IN_POSITION)
+                self.state.set(State.IN_POSITION)
             else:
-                sm.set(State.ERROR)
+                self.state.set(State.ERROR)
 
         elif kind == "SELL":
-            sm.set(State.EXITING)
-            ok = self.broker.sell(symbol, action)
+            self.state.set(State.EXITING)
+            ok = self.broker.sell(symbol, price)
             if ok:
-                sm.set(State.POST_TRADE)
-                sm.set(State.IDLE)
+                self.world.set_entry(symbol, None)
+                self.world.set_state(symbol, State.IDLE)
+                self.state.set(State.POST_TRADE)
+                self.state.set(State.IDLE)
             else:
-                sm.set(State.ERROR)
+                self.state.set(State.ERROR)
