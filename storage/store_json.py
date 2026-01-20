@@ -26,22 +26,30 @@ class JSONStore:
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(snapshot, f, indent=4, ensure_ascii=False)
 
-    def record_trade(self, action: dict, status: str, mode: str) -> None:
+    def record_event(self, event: dict) -> None:
+        """
+        Registra eventos operacionais:
+        - decisões
+        - bloqueios
+        - estados
+        - erros
+        """
+        data = self.load() or {}
+
+        events = data.get("events", [])
+        events.append(event)
+
+        data["events"] = events
+        self.save(data)
+
+    def record_trade(self, trade: dict) -> None:
+        """
+        Registra apenas ações financeiras.
+        """
         data = self.load() or {}
 
         trades = data.get("trades", [])
+        trades.append(trade)
 
-        event = {
-            "symbol": action.get("symbol"),
-            "side": action.get("type"),
-            "price": action.get("price"),
-            "reason": action.get("reason"),
-            "status": status,
-            "mode": mode,
-            "time": datetime.utcnow().isoformat(),
-        }
-
-        trades.append(event)
         data["trades"] = trades
-
         self.save(data)

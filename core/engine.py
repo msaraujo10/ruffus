@@ -9,7 +9,8 @@ class Engine:
     - coordenar StateMachine, World, DecisionEngine e RiskManager
     - restaurar o estado persistido no boot
     - executar ações aprovadas
-    - persistir snapshots consistentes após cada mutação
+    - registrar eventos e trades
+    - persistir snapshots consistentes
     """
 
     def __init__(self, broker, world, decision, risk, store, mode: str):
@@ -28,39 +29,10 @@ class Engine:
     def boot(self):
         print("🔄 Restaurando estado persistido.")
 
-        data = self.store.load() or {}
-
-        # Restaura componentes lógicos
-        self.state.import_state(data.get("state"))
-        self.world.import_state(data.get("world"))
-        self.decision.import_state(data.get("decision"))
-
-        # Sincronização REAL
-        if self.mode == "REAL":
-            for symbol in self.world.symbols:
-                pos = self.broker.get_open_position(symbol)
-                if pos:
-                    print(f"🔗 Posição real detectada em {symbol}. Sincronizando.")
-                    self.decision.entries[symbol] = pos["entry_price"]
-                    self.state.set(State.IN_POSITION)
-                    return
-
-        # Caso normal
-        if self.state.current() == State.BOOT:
-            self.state.set(State.IDLE)
-
-        """
-        Inicializa o sistema.
-
-        - tenta carregar snapshot persistido
-        - restaura todos os módulos
-        - se não houver snapshot, inicia limpo
-        """
-
         snapshot = self.store.load()
 
         if snapshot:
-            print("🔄 Restaurando estado persistido...")
+            print("🔄 Estado encontrado. Restaurando...")
 
             # State
             state_name = snapshot.get("state")
@@ -80,32 +52,49 @@ class Engine:
             self.state.set(State.IDLE)
             self.persist()
 
+        # Sincronização REAL
+        if self.mode == "REAL":
+            for symbol in self.world.symbols:
+                pos = self.broker.get_open_position(symbol)
+                if pos:
+                    print(f"🔗 Posição real detectada em {symbol}. Sincronizando.")
+                    self.decision.entries[symbol] = pos["entry_price"]
+                    self.state.set(State.IN_POSITION)
+                    return
+
+        # Caso ainda esteja em BOOT
+        if self.state.current() == State.BOOT:
+            self.state.set(State.IDLE)
+
     # -------------------------------------------------
     # CICLO PRINCIPAL
     # -------------------------------------------------
     def tick(self, market_snapshot: dict):
-        """
-        Um ciclo completo do robô.
-        """
+        current = self.state.current()
 
         # Atualiza o mundo
         self.world.update(market_snapshot)
-
-        current_state = self.state.current()
         world_view = self.world.snapshot()
 
-        action = self.decision.decide(current_state, world_view)
+        action = self.decision.decide(current, world_view)
+
+        base_event = {
+            "state": current.name,
+            "world": world_view,
+            "action": action,
+            "mode": self.mode,
+        }
 
         if not action:
+            self.store.record_event({**base_event, "result": "NO_ACTION"})
             return
 
-        # 🔒 REGRA GLOBAL: nunca comprar se já houver posição
-        if current_state == State.IN_POSITION and action["type"] == "BUY":
-            print("⛔ BUY bloqueado: já existe posição aberta.")
+        if not self.risk.allow(current, action):
+            self.store.record_event({**base_event, "result": "BLOCKED_BY_RISK"})
             return
 
-        if not self.risk.allow(current_state, action):
-            return
+        # Ação aprovada
+        self.store.record_event({**base_event, "result": "APPROVED"})
 
         self.execute(action)
 
@@ -114,40 +103,44 @@ class Engine:
     # -------------------------------------------------
     def execute(self, action: dict):
         kind = action["type"]
+        status = "UNKNOWN"
 
         try:
             if kind == "BUY":
                 self.state.set(State.ENTERING)
                 ok = self.broker.buy(action)
+                if ok:
+                    self.state.set(State.IN_POSITION)
+                    status = "EXECUTED"
+                else:
+                    self.state.set(State.ERROR)
+                    status = "FAILED"
 
             elif kind == "SELL":
                 self.state.set(State.EXITING)
                 ok = self.broker.sell(action)
-
-            else:
-                return
-
-            if ok:
-                status = "EXECUTED"
-                if kind == "BUY":
-                    self.state.set(State.IN_POSITION)
-                else:
+                if ok:
                     self.state.set(State.POST_TRADE)
                     self.state.set(State.IDLE)
-            else:
-                status = "BLOCKED"
-                self.state.set(State.ERROR)
+                    status = "EXECUTED"
+                else:
+                    self.state.set(State.ERROR)
+                    status = "FAILED"
 
         except Exception:
             status = "ERROR"
             self.state.set(State.ERROR)
 
-        # Persistência obrigarória
+        # Registro financeiro (apenas uma vez por ação real)
         self.store.record_trade(
             action=action,
             status=status,
-            mode=self.mode,  # VIRTUAL, OBSERVDOR ou REAL
+            mode=self.mode,
+            state=self.state.current().name,
         )
+
+        # Persistência obrigatória após mutação real
+        self.persist()
 
     # -------------------------------------------------
     # PERSISTÊNCIA CENTRAL
