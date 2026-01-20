@@ -1,76 +1,126 @@
-from core.state_machine import State
+from core.state_machine import State, StateMachine
 
 
 class Engine:
     """
-    Orquestrador central.
-    Não conhece API.
-    Não conhece estratégia.
-    Apenas coordena:
-    World → Decision → Risk → Broker → StateMachine
+    Orquestrador central do sistema.
+
+    Responsabilidades:
+    - coordenar StateMachine, World, DecisionEngine e RiskManager
+    - restaurar o estado persistido no boot
+    - executar ações aprovadas
+    - persistir snapshots consistentes após cada mutação
     """
 
-    def __init__(self, broker, decision, risk, world, store):
+    def __init__(self, broker, world, decision, risk, store):
         self.broker = broker
+        self.world = world
         self.decision = decision
         self.risk = risk
-        self.world = world
         self.store = store
-        self.state = None  # será injetado no boot()
 
-    def boot(self, state_machine):
-        """
-        Inicializa o sistema restaurando estado salvo, se existir.
-        """
-        self.state = state_machine
+        self.state = StateMachine()
 
-        data = self.store.load()
-        if data:
-            self.state.import_state(data.get("state"))
-            self.world.import_state(data.get("world"))
-            self.decision.import_state(data.get("decision"))
+    # -------------------------------------------------
+    # BOOT
+    # -------------------------------------------------
+    def boot(self):
+        """
+        Inicializa o sistema.
+
+        - tenta carregar snapshot persistido
+        - restaura todos os módulos
+        - se não houver snapshot, inicia limpo
+        """
+
+        snapshot = self.store.load()
+
+        if snapshot:
+            print("🔄 Restaurando estado persistido...")
+
+            # State
+            state_name = snapshot.get("state")
+            if state_name:
+                self.state.set(State[state_name])
+
+            # World
+            if "world" in snapshot:
+                self.world.import_state(snapshot["world"])
+
+            # Decision
+            if "decision" in snapshot:
+                self.decision.import_state(snapshot["decision"])
+
         else:
-            self.state.set(State.SYNC)
+            print("🆕 Nenhum estado encontrado. Inicialização limpa.")
             self.state.set(State.IDLE)
+            self.persist()
 
-    def tick(self, snapshot: dict):
-        current = self.state.current()
+    # -------------------------------------------------
+    # CICLO PRINCIPAL
+    # -------------------------------------------------
+    def tick(self, market_snapshot: dict):
+        """
+        Um ciclo completo do robô.
+        """
 
-        action = self.decision.decide(current, snapshot)
+        # Atualiza o mundo
+        self.world.update(market_snapshot)
+
+        current_state = self.state.current()
+        world_view = self.world.snapshot()
+
+        action = self.decision.decide(current_state, world_view)
+
         if not action:
             return
 
-        if not self.risk.allow(current, action):
+        if not self.risk.allow(current_state, action):
             return
 
         self.execute(action)
 
+    # -------------------------------------------------
+    # EXECUÇÃO
+    # -------------------------------------------------
     def execute(self, action: dict):
         kind = action["type"]
-        symbol = action["symbol"]
 
         if kind == "BUY":
             self.state.set(State.ENTERING)
-            ok = self.broker.buy(symbol, action)
+            ok = self.broker.buy(action)
+
             if ok:
                 self.state.set(State.IN_POSITION)
+                self.persist()
             else:
                 self.state.set(State.ERROR)
+                self.persist()
 
         elif kind == "SELL":
             self.state.set(State.EXITING)
-            ok = self.broker.sell(symbol, action)
+            ok = self.broker.sell(action)
+
             if ok:
                 self.state.set(State.POST_TRADE)
                 self.state.set(State.IDLE)
+                self.persist()
             else:
                 self.state.set(State.ERROR)
+                self.persist()
 
-        # Persistir sempre após qualquer ação
-        self.store.save(
-            {
-                "state": self.state.export(),
-                "world": self.world.export(),
-                "decision": self.decision.export(),
-            }
-        )
+    # -------------------------------------------------
+    # PERSISTÊNCIA CENTRAL
+    # -------------------------------------------------
+    def persist(self):
+        """
+        Salva um snapshot consistente de todo o sistema.
+        """
+
+        snapshot = {
+            "state": self.state.current().name,
+            "world": self.world.export(),
+            "decision": self.decision.export(),
+        }
+
+        self.store.save(snapshot)

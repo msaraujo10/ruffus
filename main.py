@@ -1,7 +1,6 @@
 import time
 
 from core.engine import Engine
-from core.state_machine import StateMachine
 from core.decision import DecisionEngine
 from core.risk import RiskManager
 from core.world import World
@@ -11,32 +10,40 @@ from storage.store_json import StoreJSON
 
 
 def main():
-    print("🧠 RUFFUS — V2 ESTÁVEL (MODO VIRTUAL | MULTI-ATIVO)")
+    print("🧠 RUFFUS — V2 ESTÁVEL (MODO VIRTUAL + PERSISTENTE)")
 
     config = {
-        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
         "stop_loss": -0.5,
         "take_profit": 1.2,
         "sleep": 1,
+        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
     }
 
-    store = StoreJSON("data/state.json")
-
+    # Infraestrutura
     broker = VirtualBroker(config["symbols"])
+    world = World(config["symbols"])
     decision = DecisionEngine(config)
     risk = RiskManager(config)
-    world = World(config["symbols"], store)
-    engine = Engine(broker, decision, risk, world, store)
+    store = StoreJSON("storage/state.json")
 
-    state_machine = StateMachine()
-    engine.boot(state_machine)
+    # Núcleo
+    engine = Engine(
+        broker=broker,
+        world=world,
+        decision=decision,
+        risk=risk,
+        store=store,
+    )
+
+    # Boot com restauração automática
+    engine.boot()
 
     while True:
         try:
-            feed = broker.tick()  # { "BTCUSDT": price, ... }
-            world.update(feed)
+            # Simula feed de mercado multi-ativo
+            feed = broker.tick()  # ex: {"BTCUSDT": 1.01, "ETHUSDT": 0.99, ...}
 
-            engine.tick(world.snapshot())
+            engine.tick(feed)
 
             time.sleep(config["sleep"])
 
