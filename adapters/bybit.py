@@ -47,6 +47,37 @@ class BybitBroker:
 
         return prices
 
+    # verifica se tem ordem aberta
+    def get_open_position(self, symbol: str) -> dict | None:
+        """
+        Retorna:
+        {
+            "symbol": "BTCUSDT",
+            "entry_price": 90481.2,
+            "size": 0.001
+        }
+        ou None se não houver posição aberta.
+        """
+        if self.mode != "REAL":
+            return None
+
+        try:
+            r = self.session.get_positions(category="spot", symbol=symbol)
+            data = r.get("result", {}).get("list", [])
+
+            for p in data:
+                size = float(p.get("size", 0))
+                if size > 0:
+                    return {
+                        "symbol": symbol,
+                        "entry_price": float(p["avgPrice"]),
+                        "size": size,
+                    }
+        except Exception as e:
+            print(f"[BROKER] Erro ao consultar posição real: {e}")
+
+        return None
+
     def buy(self, action: dict) -> bool:
         symbol = action["symbol"]
         price = action.get("price")

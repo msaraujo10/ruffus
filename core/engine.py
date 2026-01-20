@@ -26,15 +26,27 @@ class Engine:
     # BOOT
     # -------------------------------------------------
     def boot(self):
+        print("🔄 Restaurando estado persistido.")
 
-        data = self.store.load()
+        data = self.store.load() or {}
 
-        if data:
-            print("🔄 Restaurando estado persistido.")
-            self.state.import_state({"state": data.get("state")})
-            self.world.import_state(data.get("world"))
-            self.decision.import_state(data.get("decision"))
-        else:
+        # Restaura componentes lógicos
+        self.state.import_state(data.get("state"))
+        self.world.import_state(data.get("world"))
+        self.decision.import_state(data.get("decision"))
+
+        # Sincronização REAL
+        if self.mode == "REAL":
+            for symbol in self.world.symbols:
+                pos = self.broker.get_open_position(symbol)
+                if pos:
+                    print(f"🔗 Posição real detectada em {symbol}. Sincronizando.")
+                    self.decision.entries[symbol] = pos["entry_price"]
+                    self.state.set(State.IN_POSITION)
+                    return
+
+        # Caso normal
+        if self.state.current() == State.BOOT:
             self.state.set(State.IDLE)
 
         """
