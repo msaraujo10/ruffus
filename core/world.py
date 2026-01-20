@@ -4,8 +4,9 @@ class World:
     Mantém preços por símbolo.
     """
 
-    def __init__(self, symbols: list[str]):
+    def __init__(self, symbols, store):
         self.symbols = symbols
+        self.store = store
         self.prices = {s: None for s in symbols}
 
     def update(self, feed: dict):

@@ -1,32 +1,34 @@
 import time
-
-from core.engine import Engine
-from core.decision import DecisionEngine
-from core.risk import RiskManager
-from core.world import World
+import json
 
 from adapters.virtual import VirtualBroker
-from storage.store_json import StoreJSON
+from storage.store_json import JSONStore
+
+from core.engine import Engine
+from core.world import World
+from core.decision import DecisionEngine
+from core.risk import RiskManager
 
 
 def main():
-    print("🧠 RUFFUS — V2 ESTÁVEL (MODO VIRTUAL + PERSISTENTE)")
+    print("🧠 RUFFUS — V2 ESTÁVEL (MODO VIRTUAL | MULTI-ATIVO | PERSISTENTE)")
 
-    config = {
-        "stop_loss": -0.5,
-        "take_profit": 1.2,
-        "sleep": 1,
-        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
-    }
+    # Carrega config
+    with open("config/config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
 
-    # Infraestrutura
-    broker = VirtualBroker(config["symbols"])
-    world = World(config["symbols"])
+    symbols = config["symbols"]
+
+    # Infra
+    broker = VirtualBroker(symbols)
+    store = JSONStore("data/state.json")
+
+    # Domínio
+    world = World(symbols, store)
     decision = DecisionEngine(config)
     risk = RiskManager(config)
-    store = StoreJSON("storage/state.json")
 
-    # Núcleo
+    # Orquestrador
     engine = Engine(
         broker=broker,
         world=world,
@@ -35,17 +37,24 @@ def main():
         store=store,
     )
 
-    # Boot com restauração automática
+    # Boot com restauração
     engine.boot()
 
     while True:
         try:
-            # Simula feed de mercado multi-ativo
-            feed = broker.tick()  # ex: {"BTCUSDT": 1.01, "ETHUSDT": 0.99, ...}
+            # Feed bruto do broker
+            feed = broker.tick()
 
-            engine.tick(feed)
+            # Atualiza o mundo
+            world.update(feed)
 
-            time.sleep(config["sleep"])
+            # Snapshot imutável
+            snapshot = world.snapshot()
+
+            # Ciclo do sistema
+            engine.tick(snapshot)
+
+            time.sleep(config.get("sleep", 1))
 
         except KeyboardInterrupt:
             print("\n⏹ Execução interrompida.")
