@@ -5,6 +5,7 @@ from core.decision import DecisionEngine
 from core.risk import RiskManager
 from core.world import World
 from adapters.virtual import VirtualBroker
+from storage.store_json import Store
 
 
 def main():
@@ -17,18 +18,19 @@ def main():
         "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
     }
 
+    store = Store("data/state.json")
     broker = VirtualBroker(config["symbols"])
     decision = DecisionEngine(config)
     risk = RiskManager(config)
 
-    world = World(config["symbols"])
-    engine = Engine(broker, decision, risk, config["symbols"])
+    world = World(config["symbols"], store)
+    engine = Engine(broker, decision, risk, world)
 
     engine.boot()
 
     while True:
         try:
-            feed = broker.tick()  # { "BTCUSDT": price, ... }
+            feed = broker.tick()  # {"BTCUSDT": price, ...}
             world.update(feed)
 
             engine.tick(world.snapshot())

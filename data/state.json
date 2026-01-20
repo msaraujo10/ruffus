@@ -1,0 +1,14 @@
+{
+  "BTCUSDT": {
+    "state": "IN_POSITION",
+    "entry": 1.749416
+  },
+  "ETHUSDT": {
+    "state": "IDLE",
+    "entry": null
+  },
+  "SOLUSDT": {
+    "state": "IDLE",
+    "entry": null
+  }
+}
