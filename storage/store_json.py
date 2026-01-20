@@ -1,19 +1,14 @@
 import json
-from pathlib import Path
+import os
 
 
-class Store:
-    """
-    Persistência simples em JSON.
-    Guarda o estado completo do mundo.
-    """
-
-    def __init__(self, path: str = "data/state.json"):
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+class JsonStore:
+    def __init__(self, path="data/state.json"):
+        self.path = path
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
 
     def load(self) -> dict:
-        if not self.path.exists():
+        if not os.path.exists(self.path):
             return {}
 
         try:
@@ -22,6 +17,6 @@ class Store:
         except Exception:
             return {}
 
-    def save(self, state: dict):
+    def save(self, data: dict):
         with open(self.path, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2, ensure_ascii=False)
+            json.dump(data, f, indent=2, ensure_ascii=False)
