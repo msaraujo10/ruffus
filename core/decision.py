@@ -2,19 +2,26 @@ from core.state_machine import State
 
 
 class DecisionEngine:
-    def __init__(self, config: dict, store):
+    """
+    Cérebro multi-ativo do robô.
+
+    Ele:
+    - decide entradas por símbolo
+    - acompanha preços de entrada por símbolo
+    - gera ações BUY / SELL independentes
+    """
+
+    def __init__(self, config: dict):
         self.config = config
-        self.store = store
 
-        data = self.store.load()
-        self.entries = data.get("entries", {})
-
-    def _persist(self):
-        self.store.save({"entries": self.entries})
+        # memória por ativo
+        # ex: { "BTCUSDT": 1.0023, "ETHUSDT": 0.9981 }
+        self.entries: dict[str, float] = {}
 
     def decide(self, state: State, world: dict):
         prices = world["prices"]
 
+        # Se não estamos em posição, procurar entrada
         if state == State.IDLE:
             for symbol, price in prices.items():
                 if price is None:
@@ -22,13 +29,13 @@ class DecisionEngine:
 
                 if self.should_enter(symbol, price):
                     self.entries[symbol] = price
-                    self._persist()
                     return {
                         "type": "BUY",
                         "symbol": symbol,
                         "price": price,
                     }
 
+        # Se estamos em posição, gerenciar saída
         if state == State.IN_POSITION:
             for symbol, entry in list(self.entries.items()):
                 price = prices.get(symbol)
@@ -38,8 +45,6 @@ class DecisionEngine:
                 change = ((price - entry) / entry) * 100
 
                 if change <= self.config["stop_loss"]:
-                    del self.entries[symbol]
-                    self._persist()
                     return {
                         "type": "SELL",
                         "symbol": symbol,
@@ -48,8 +53,6 @@ class DecisionEngine:
                     }
 
                 if change >= self.config["take_profit"]:
-                    del self.entries[symbol]
-                    self._persist()
                     return {
                         "type": "SELL",
                         "symbol": symbol,
@@ -60,4 +63,23 @@ class DecisionEngine:
         return None
 
     def should_enter(self, symbol: str, price: float) -> bool:
+        """
+        Filtro de entrada.
+        Por enquanto: sempre True.
+        Depois: volume, tendência, candle, etc.
+        """
         return True
+
+    # ---- Persistência ----
+
+    def export(self) -> dict:
+        """
+        Estado serializável do DecisionEngine.
+        """
+        return {"entries": dict(self.entries)}
+
+    def import_state(self, data: dict | None):
+        if not data:
+            return
+
+        self.entries = data.get("entries", {})
