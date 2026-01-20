@@ -99,6 +99,11 @@ class Engine:
         if not action:
             return
 
+        # 🔒 REGRA GLOBAL: nunca comprar se já houver posição
+        if current_state == State.IN_POSITION and action["type"] == "BUY":
+            print("⛔ BUY bloqueado: já existe posição aberta.")
+            return
+
         if not self.risk.allow(current_state, action):
             return
 
