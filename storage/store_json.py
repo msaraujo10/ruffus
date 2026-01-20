@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 
-class StoreJSON:
+class JSONStore:
     def __init__(self, path: str):
         self.path = path
 
