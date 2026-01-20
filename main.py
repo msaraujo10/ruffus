@@ -1,32 +1,52 @@
 import time
 import json
 
-from adapters.virtual import VirtualBroker
-from storage.store_json import JSONStore
-
 from core.engine import Engine
-from core.world import World
 from core.decision import DecisionEngine
 from core.risk import RiskManager
+from core.world import World
+from storage.store_json import JSONStore
+
+from adapters.virtual import VirtualBroker
+from adapters.bybit import BybitObserver
+
+
+MODE = "VIRTUAL"  # "VIRTUAL" | "REAL_OBSERVER"
 
 
 def main():
-    print("🧠 RUFFUS — V2 ESTÁVEL (MODO VIRTUAL | MULTI-ATIVO | PERSISTENTE)")
+    print(f"🧠 RUFFUS — V2 ESTÁVEL ({MODE})")
 
-    # Carrega config
-    with open("config/config.json", "r", encoding="utf-8") as f:
+    with open("config/config.json", "r") as f:
         config = json.load(f)
 
     symbols = config["symbols"]
 
-    # Infra
-    broker = VirtualBroker(symbols)
+    # Persistência
     store = JSONStore("data/state.json")
 
     # Domínio
     world = World(symbols, store)
     decision = DecisionEngine(config)
     risk = RiskManager(config)
+
+    # Fonte de mercado
+    if MODE == "VIRTUAL":
+        broker = VirtualBroker(symbols)
+
+    elif MODE == "REAL_OBSERVER":
+        with open("config/bybit.json", "r") as f:
+            keys = json.load(f)
+
+        broker = BybitObserver(
+            symbols=symbols,
+            api_key=keys["api_key"],
+            api_secret=keys["api_secret"],
+            testnet=keys.get("testnet", False),
+        )
+
+    else:
+        raise ValueError("MODE inválido")
 
     # Orquestrador
     engine = Engine(
@@ -37,24 +57,16 @@ def main():
         store=store,
     )
 
-    # Boot com restauração
     engine.boot()
 
     while True:
         try:
-            # Feed bruto do broker
             feed = broker.tick()
-
-            # Atualiza o mundo
             world.update(feed)
 
-            # Snapshot imutável
-            snapshot = world.snapshot()
+            engine.tick(world.snapshot())
 
-            # Ciclo do sistema
-            engine.tick(snapshot)
-
-            time.sleep(config.get("sleep", 1))
+            time.sleep(config["sleep"])
 
         except KeyboardInterrupt:
             print("\n⏹ Execução interrompida.")
