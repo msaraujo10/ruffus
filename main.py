@@ -31,8 +31,8 @@ def main():
     elif MODE == "OBSERVADOR":
         broker = BybitBroker(
             config["symbols"],
-            mode="OBSERVADOR",
-            armed=False,
+            mode=MODE,
+            armed=config.get("armed", False),
         )
 
     elif MODE == "REAL":
@@ -56,6 +56,7 @@ def main():
         decision=decision,
         risk=risk,
         store=store,
+        mode=MODE,
     )
 
     engine.boot()

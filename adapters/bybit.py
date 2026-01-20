@@ -3,11 +3,11 @@ from pybit.unified_trading import HTTP
 
 class BybitBroker:
     """
-    Broker real com três modos:
+    Broker real da Bybit.
 
-    - OBSERVADOR: nunca executa ordens
-    - REAL + armed=False: simula, mas bloqueia execução
-    - REAL + armed=True: executa ordens reais (futuro)
+    Modos:
+    - OBSERVADOR: nunca executa ordens (apenas loga)
+    - REAL: executa ordens apenas se armed == True
     """
 
     def __init__(
@@ -24,7 +24,7 @@ class BybitBroker:
 
     def tick(self) -> dict:
         """
-        Retorna:
+        Retorna preços reais da Bybit:
         {
             "BTCUSDT": 90481.0,
             "ETHUSDT": 3047.2,
@@ -36,37 +36,40 @@ class BybitBroker:
         for symbol in self.symbols:
             try:
                 r = self.session.get_tickers(category="spot", symbol=symbol)
-
                 if r.get("retCode") != 0:
                     prices[symbol] = None
-                    continue
-
-                last = float(r["result"]["list"][0]["lastPrice"])
-                prices[symbol] = last
-
-            except Exception:
+                else:
+                    last = r["result"]["list"][0]["lastPrice"]
+                    prices[symbol] = float(last)
+            except Exception as e:
+                print(f"[BYBIT] Erro ao buscar {symbol}: {e}")
                 prices[symbol] = None
 
         return prices
 
-    # --------------------------
-    # EXECUÇÃO CONTROLADA
-    # --------------------------
-
     def buy(self, action: dict) -> bool:
-        if self.mode == "OBSERVADOR" or not self.armed:
+        symbol = action["symbol"]
+        price = action.get("price")
+
+        if self.mode != "REAL" or not self.armed:
             print(f"[OBSERVADOR] BUY ignorado: {action}")
             return False
 
-        # FUTURO: execução real aqui
-        print(f"[REAL] BUY enviado: {action}")
+        print(f"🚨 [REAL BUY] {symbol} @ {price}")
+        # Aqui futuramente entra a ordem real:
+        # self.session.place_order(...)
+
         return True
 
     def sell(self, action: dict) -> bool:
-        if self.mode == "OBSERVADOR" or not self.armed:
+        symbol = action["symbol"]
+        price = action.get("price")
+
+        if self.mode != "REAL" or not self.armed:
             print(f"[OBSERVADOR] SELL ignorado: {action}")
             return False
 
-        # FUTURO: execução real aqui
-        print(f"[REAL] SELL enviado: {action}")
+        print(f"🚨 [REAL SELL] {symbol} @ {price}")
+        # self.session.place_order(...)
+
         return True
