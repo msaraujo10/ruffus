@@ -1,19 +1,27 @@
 import json
-from pathlib import Path
+import os
+from datetime import datetime
 
 
 class StoreJSON:
-    def __init__(self, path="data/state.json"):
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, path: str):
+        self.path = path
 
-    def save(self, data: dict):
-        with self.path.open("w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+    def exists(self) -> bool:
+        return os.path.exists(self.path)
 
     def load(self) -> dict | None:
-        if not self.path.exists():
+        if not self.exists():
             return None
 
-        with self.path.open("r", encoding="utf-8") as f:
+        with open(self.path, "r", encoding="utf-8") as f:
             return json.load(f)
+
+    def save(self, snapshot: dict) -> None:
+        snapshot["meta"] = {
+            "version": "2.0",
+            "last_update": datetime.utcnow().isoformat(),
+        }
+
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f, indent=4, ensure_ascii=False)
