@@ -1,20 +1,42 @@
-from core.state_machine import State, StateMachine
+from core.state_machine import State
 
 
 class Engine:
-    def __init__(self, broker, decision, risk):
+    """
+    Orquestrador central.
+    Não conhece API.
+    Não conhece estratégia.
+    Apenas coordena:
+    World → Decision → Risk → Broker → StateMachine
+    """
+
+    def __init__(self, broker, decision, risk, world, store):
         self.broker = broker
         self.decision = decision
         self.risk = risk
-        self.state = StateMachine()
+        self.world = world
+        self.store = store
+        self.state = None  # será injetado no boot()
 
-    def boot(self):
-        self.state.set(State.SYNC)
+    def boot(self, state_machine):
+        """
+        Inicializa o sistema restaurando estado salvo, se existir.
+        """
+        self.state = state_machine
 
-    def tick(self, market_data):
+        data = self.store.load()
+        if data:
+            self.state.import_state(data.get("state"))
+            self.world.import_state(data.get("world"))
+            self.decision.import_state(data.get("decision"))
+        else:
+            self.state.set(State.SYNC)
+            self.state.set(State.IDLE)
+
+    def tick(self, snapshot: dict):
         current = self.state.current()
 
-        action = self.decision.decide(current, market_data)
+        action = self.decision.decide(current, snapshot)
         if not action:
             return
 
@@ -43,3 +65,12 @@ class Engine:
                 self.state.set(State.IDLE)
             else:
                 self.state.set(State.ERROR)
+
+        # Persistir sempre após qualquer ação
+        self.store.save(
+            {
+                "state": self.state.export(),
+                "world": self.world.export(),
+                "decision": self.decision.export(),
+            }
+        )
