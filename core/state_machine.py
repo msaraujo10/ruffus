@@ -14,8 +14,7 @@ class State(Enum):
 
 class StateMachine:
     """
-    Controla o estado global do robô.
-    Agora é persistente.
+    Máquina de estados do sistema.
     """
 
     def __init__(self):
@@ -28,18 +27,15 @@ class StateMachine:
         if not isinstance(new_state, State):
             raise ValueError("Estado inválido")
 
-        print(f"STATE: {self._state.name} -> {new_state.name}")
+        print(f"🔁 STATE: {self._state.name} → {new_state.name}")
         self._state = new_state
 
-    # -------- Persistência --------
+    # ---------- Persistência ----------
 
     def export(self) -> dict:
         return {"state": self._state.name}
 
-    def import_state(self, data: dict | None):
-        if not data:
-            return
-
+    def import_state(self, data: dict):
         name = data.get("state")
         if name and name in State.__members__:
             self._state = State[name]
