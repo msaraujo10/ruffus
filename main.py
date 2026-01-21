@@ -1,5 +1,5 @@
 import time
-
+import os, json
 from core.engine import Engine
 from core.state_machine import State
 from core.decision import DecisionEngine
@@ -11,11 +11,14 @@ from adapters.bybit import BybitBroker
 from storage.store_json import JSONStore
 
 
-MODE = "OBSERVADOR"  # "VIRTUAL" ou "REAL"
+MODE = "REPLAY"  # "VIRTUAL" ou "REAL"
 
 
 def main():
     print(f"🧠 RUFFUS — V2 ESTÁVEL ({MODE})")
+    if MODE == "REPLAY":
+        replay()
+        return
 
     config = {
         "stop_loss": -0.5,
@@ -78,6 +81,33 @@ def main():
         except KeyboardInterrupt:
             print("\n⏹ Execução interrompida.")
             break
+
+
+def replay():
+    from storage.store_json import JSONStore
+
+    print("🎞️  MODO REPLAY\n")
+
+    path = "storage/events.jsonl"
+    if not os.path.exists(path):
+        print("Nenhum evento encontrado.")
+        return
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            e = json.loads(line)
+
+            ts = e.get("ts")
+            state = e.get("state")
+            action = e.get("action")
+            result = e.get("result")
+
+            if action:
+                msg = f"{action['type']} {action['symbol']} @ {action['price']}"
+            else:
+                msg = "—"
+
+            print(f"[REPLAY] {ts} | {state} | {msg} | {result}")
 
 
 if __name__ == "__main__":
