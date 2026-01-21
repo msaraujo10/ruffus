@@ -16,7 +16,10 @@ MODE = "VIRTUAL"  # OBSERVADOR | REAL | VIRTUAL
 
 
 def main():
+    global MODE
+
     mode = MODE
+
     print(f"🧠 RUFFUS — V2 ESTÁVEL ({mode})")
 
     config = {
@@ -28,20 +31,52 @@ def main():
         "armed": True,
     }
 
+    # 🧠 CONGNIÇÃO
     memory = CognitiveMemory()
     health = memory.health()
+    profile = memory.profile()
+    recs = memory.recomendations()
+    print(f"🧠 Health: {health}")
+    print(f"🧠 Perfil cognitivo: {profile}")
+
+    # Regras por recomendação textual
+    for r in recs:
+        r_low = r.lower()
+        if "reduzir take profit" in r_low:
+            config["take_profit"] *= 0.8
+            print("🧠 Ajuste: take_profit reduzido.")
+
+        if "aumentar stop loss" in r_low:
+            config["stop_loss"] *= 1.2
+            print("🧠 Ajuste: stop_loss ampliado.")
+        if "revisar configuração de risco" in r_low:
+            config["armed"] = False
+            print("🧠 Ajuste: sistema desarmado por recomendação cognitiva.")
 
     if health == "RISK_BLOCKED":
-        print("🧠 Sistema em estado RISK_BLOCKED. Desarmando automaticamente.")
+        print("🛑 Sistema em estado RISK_BLOCKED. Desarmando automaticamente.")
         config["armed"] = False
 
     elif health == "UNSTABLE":
-        print("🧠 Sistema instável. Forçando modo OBSERVADOR.")
+        print("🛑 Sistema instável. Forçando modo OBSERVADOR.")
         mode = "OBSERVADOR"
 
     if mode == "VIRTUAL":
         replay()
         return
+    # Ajuste cognitivo do comportamento
+    if profile == "PAUSED":
+        config["armed"] = False
+
+    elif profile == "CONSERVATIVE":
+        config["take_profit"] = 0.6
+        config["stop_loss"] = -0.3
+
+    elif profile == "AGGRESSIVE":
+        config["take_profit"] = 2.0
+        config["stop_loss"] = -0.8
+
+    # NORMAL → mantém os valores padrão
 
     # Escolha do broker
     if mode == "VIRTUAL":
