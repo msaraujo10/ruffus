@@ -1,0 +1,19 @@
+{
+    "health": "RISK_BLOCKED",
+    "summary": {
+        "events": 14,
+        "buys": 0,
+        "sells": 0,
+        "blocked": 14,
+        "errors": 0
+    },
+    "problems": [
+        "Muitas ações bloqueadas pelo RiskManager."
+    ],
+    "signals": [],
+    "recommendations": [
+        "Revisar configuração de risco.",
+        "Verificar se o sistema está armado."
+    ],
+    "updated_at": "2026-01-21T17:33:53.869995"
+}

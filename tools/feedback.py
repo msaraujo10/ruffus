@@ -1,28 +1,25 @@
 import json
 import os
+from datetime import datetime
 
 
 class FeedbackEngine:
-    def __init__(self, events_path: str):
+    """
+    Lê eventos do sistema (events.jsonl), resume o comportamento recente
+    e produz diagnósticos cognitivos sobre o estado do robô.
+    """
+
+    def __init__(self, events_path: str = "storage/events.jsonl"):
         self.events_path = events_path
 
-    def observe(self, state: str, world: dict, action: dict | None):
-        """
-        Recebe um evento em tempo real.
-        Por enquanto apenas ignora (ou loga).
-        No futuro poderá:
-        - acumular sinais
-        - detectar padrões online
-        - disparar alertas
-        """
-        pass
-
-    def load_events(self) -> list[dict]:
-        events = []
-
+    # -------------------------------------------------
+    # LEITURA DE EVENTOS
+    # -------------------------------------------------
+    def read_events(self, limit: int = 100) -> list[dict]:
         if not os.path.exists(self.events_path):
-            return events
+            return []
 
+        events = []
         with open(self.events_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
@@ -30,139 +27,100 @@ class FeedbackEngine:
                     continue
                 try:
                     events.append(json.loads(line))
-                except Exception:
+                except json.JSONDecodeError:
                     continue
 
-        return events
+        return events[-limit:]
 
-    def summary(self) -> dict:
-        events = self.load_events()
-
-        summary = {
-            "total_events": len(events),
-            "blocked_by_risk": 0,
-            "approved": 0,
-            "by_state": {},
-            "by_action": {},
-        }
+    # -------------------------------------------------
+    # RESUMO
+    # -------------------------------------------------
+    def summary(self, events: list[dict]) -> dict:
+        buys = 0
+        sells = 0
+        blocked = 0
+        errors = 0
 
         for e in events:
             result = e.get("result")
-            state = e.get("state")
             action = e.get("action", {})
-            kind = action.get("type")
 
-            if result == "BLOCKED_BY_RISK":
-                summary["blocked_by_risk"] += 1
-            elif result == "APPROVED":
-                summary["approved"] += 1
+            if result == "APPROVED" and action.get("type") == "BUY":
+                buys += 1
+            elif result == "APPROVED" and action.get("type") == "SELL":
+                sells += 1
+            elif result == "BLOCKED_BY_RISK":
+                blocked += 1
+            elif result in ("FAILED", "ERROR"):
+                errors += 1
 
-            if state:
-                summary["by_state"][state] = summary["by_state"].get(state, 0) + 1
+        return {
+            "events": len(events),
+            "buys": buys,
+            "sells": sells,
+            "blocked": blocked,
+            "errors": errors,
+        }
 
-            if kind:
-                summary["by_action"][kind] = summary["by_action"].get(kind, 0) + 1
-
-        return summary
-
-    def interpret(self, summary: dict) -> list[str]:
-        """
-        Recebe o resumo numérico e retorna uma lista de insights humanos.
-        """
-        insights = []
-
-        total = summary.get("total_events", 0)
-        approved = summary.get("approved", 0)
-        blocked = summary.get("blocked_by_risk", 0)
-
-        by_state = summary.get("by_state", {})
-        by_action = summary.get("by_action", {})
-
-        # 1. Nenhuma ação aprovada
-        if total > 0 and approved == 0:
-            insights.append("Nenhuma ação foi aprovada no período analisado.")
-
-        # 2. Tudo bloqueado por risco
-        if total > 0 and blocked == total:
-            insights.append("Todas as ações foram bloqueadas pelo sistema de risco.")
-
-        # 3. Apenas um estado observado
-        if len(by_state) == 1:
-            state = next(iter(by_state.keys()))
-            insights.append(f"O robô permaneceu exclusivamente no estado {state}.")
-
-        # 4. Apenas um tipo de ação
-        if len(by_action) == 1:
-            action = next(iter(by_action.keys()))
-            insights.append(f"O robô tentou apenas ações do tipo {action}.")
-
-        return insights
-
-    def diagnose(self) -> dict:
-        """
-        Analisa o resumo dos eventos e produz um diagnóstico cognitivo do sistema.
-        Retorna um dicionário com:
-            - health
-            - problems
-            - signals
-            - recommendations
-        """
-
-        summary = self.summary()
+    # -------------------------------------------------
+    # DIAGNÓSTICO
+    # -------------------------------------------------
+    def diagnose(self, limit: int = 100) -> dict:
+        events = self.read_events(limit)
+        summary = self.summary(events)
 
         problems = []
         signals = []
         recommendations = []
 
-        total = summary.get("total", 0)
-        executed = summary.get("executed", 0)
-        blocked = summary.get("blocked", 0)
-        no_action = summary.get("no_action", 0)
+        health = "OK"
 
-        # Heurísticas básicas
-        if total == 0:
-            return {
-                "health": "EMPTY",
-                "problems": ["Nenhum evento registrado."],
-                "signals": ["Sistema ainda não produziu dados."],
-                "recommendations": [
-                    "Execute o robô em modo VIRTUAL para gerar histórico."
-                ],
-            }
-
-        blocked_ratio = blocked / max(total, 1)
-        executed_ratio = executed / max(total, 1)
-
-        if blocked_ratio > 0.6:
-            problems.append("Alta taxa de bloqueios por risco.")
-            signals.append("O sistema está excessivamente restritivo.")
-            recommendations.append(
-                "Revisar parâmetros do RiskManager (armed, limites)."
-            )
-
-        if executed == 0 and total > 50:
-            problems.append("Nenhuma ação executada apesar de muitos ciclos.")
-            signals.append("O robô está estagnado.")
-            recommendations.append("Testar em modo VIRTUAL com risco liberado.")
-
-        if no_action / max(total, 1) > 0.8:
-            signals.append("Grande parte dos ciclos sem decisão.")
-            recommendations.append("Aprimorar critérios do DecisionEngine.")
-
-        if executed_ratio > 0.1:
-            signals.append("O sistema está ativo e tomando decisões reais.")
-
-        # Determina saúde geral
-        if problems:
-            health = "DEGRADED"
-        elif executed > 0:
-            health = "HEALTHY"
+        if summary["events"] == 0:
+            health = "NO_DATA"
+            signals.append("Nenhum evento registrado ainda.")
+            recommendations.append("Deixe o sistema rodar por mais tempo.")
         else:
-            health = "IDLE"
+            if summary["blocked"] > summary["buys"]:
+                health = "RISK_BLOCKED"
+                problems.append("Muitas ações bloqueadas pelo RiskManager.")
+                recommendations.append("Revisar configuração de risco.")
+                recommendations.append("Verificar se o sistema está armado.")
 
-        return {
+            if summary["errors"] > 0:
+                health = "UNSTABLE"
+                problems.append("Ocorreram erros recentes.")
+                recommendations.append("Verificar logs e integridade dos brokers.")
+
+            if summary["buys"] == 0 and summary["events"] > 20:
+                problems.append("Nenhuma entrada executada.")
+                recommendations.append("Ajustar critérios do DecisionEngine.")
+
+        diagnosis = {
             "health": health,
+            "summary": summary,
             "problems": problems,
             "signals": signals,
             "recommendations": recommendations,
         }
+
+        # Persistência cognitiva
+        self.persist_memory(diagnosis)
+
+        return diagnosis
+
+    # -------------------------------------------------
+    # MEMÓRIA COGNITIVA
+    # -------------------------------------------------
+    def persist_memory(self, diagnosis: dict) -> None:
+        try:
+            path = "storage/memory.json"
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+
+            payload = dict(diagnosis)
+            payload["updated_at"] = datetime.utcnow().isoformat()
+
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=4, ensure_ascii=False)
+
+        except Exception as e:
+            print(f"[MEMORY] Falha ao persistir memória: {e}")
