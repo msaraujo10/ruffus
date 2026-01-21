@@ -77,6 +77,7 @@ def main():
         config["stop_loss"] = -0.8
 
     # NORMAL → mantém os valores padrão
+    memory.update_profile(profile, config)
 
     # Escolha do broker
     if mode == "VIRTUAL":

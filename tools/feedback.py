@@ -36,6 +36,7 @@ class FeedbackEngine:
     # RESUMO
     # -------------------------------------------------
     def summary(self, events: list[dict]) -> dict:
+
         buys = 0
         sells = 0
         blocked = 0
@@ -95,9 +96,24 @@ class FeedbackEngine:
                 problems.append("Nenhuma entrada executada.")
                 recommendations.append("Ajustar critérios do DecisionEngine.")
 
+        total = summary.get("events", 0) or 1
+
+        metrics = {
+            "block_rate": summary.get("blocked", 0) / total,
+            "approval_rate": (
+                summary.get("approved", 0) / total if "approved" in summary else 0.0
+            ),
+            "buy_ratio": summary.get("buys", 0) / total,
+            "sell_ratio": (
+                summary.get("sells", 0) / total if "sells" in summary else 0.0
+            ),
+            "error_rate": summary.get("errors", 0) / total,
+        }
+
         diagnosis = {
             "health": health,
             "summary": summary,
+            "metrics": metrics,
             "problems": problems,
             "signals": signals,
             "recommendations": recommendations,

@@ -59,3 +59,15 @@ class CognitiveMemory:
             return "AGGRESSIVE"
 
         return "NORMAL"
+
+    def update_profile(self, profile: str, config: dict):
+        data = self.load() or {}
+
+        data["profile"] = profile
+        data["last_config"] = {
+            "take_profit": config.get("take_profit"),
+            "stop_loss": config.get("stop_loss"),
+            "armed": config.get("armed"),
+        }
+
+        self.save(data)
