@@ -5,6 +5,7 @@ from core.state_machine import State
 from core.decision import DecisionEngine
 from core.risk import RiskManager
 from core.world import World
+from tools.feedback import FeedbackEngine
 
 from adapters.virtual import VirtualBroker
 from adapters.bybit import BybitBroker
@@ -16,6 +17,7 @@ MODE = "OBSERVADOR"  # "VIRTUAL" ou "REAL"
 
 def main():
     print(f"🧠 RUFFUS — V2 ESTÁVEL ({MODE})")
+
     if MODE == "REPLAY":
         replay()
         return
@@ -54,12 +56,15 @@ def main():
     decision = DecisionEngine(config)
     risk = RiskManager(config)
 
+    feedback = FeedbackEngine("storage/events.jsonl")
+
     engine = Engine(
         broker=broker,
         world=world,
         decision=decision,
         risk=risk,
         store=store,
+        feedback=feedback,
         mode=MODE,
     )
 
