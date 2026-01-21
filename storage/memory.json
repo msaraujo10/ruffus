@@ -7,6 +7,13 @@
         "blocked": 14,
         "errors": 0
     },
+    "metrics": {
+        "block_rate": 1.0,
+        "approval_rate": 0.0,
+        "buy_ratio": 0.0,
+        "sell_ratio": 0.0,
+        "error_rate": 0.0
+    },
     "problems": [
         "Muitas ações bloqueadas pelo RiskManager."
     ],
@@ -15,5 +22,5 @@
         "Revisar configuração de risco.",
         "Verificar se o sistema está armado."
     ],
-    "updated_at": "2026-01-21T18:38:43.702217"
+    "updated_at": "2026-01-21T23:02:29.078429"
 }
