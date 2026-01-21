@@ -6,21 +6,18 @@ from core.decision import DecisionEngine
 from core.risk import RiskManager
 from core.world import World
 from tools.feedback import FeedbackEngine
+from tools.memory import CognitiveMemory
 
 from adapters.virtual import VirtualBroker
 from adapters.bybit import BybitBroker
 from storage.store_json import JSONStore
 
-
-MODE = "VIRTUAL"  # "VIRTUAL" ou "REAL"
+MODE = "VIRTUAL"  # OBSERVADOR | REAL | VIRTUAL
 
 
 def main():
-    print(f"🧠 RUFFUS — V2 ESTÁVEL ({MODE})")
-
-    if MODE == "REPLAY":
-        replay()
-        return
+    mode = MODE
+    print(f"🧠 RUFFUS — V2 ESTÁVEL ({mode})")
 
     config = {
         "stop_loss": -0.5,
@@ -28,20 +25,36 @@ def main():
         "sleep": 1,
         "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
         "store_path": "storage/state.json",
+        "armed": True,
     }
 
+    memory = CognitiveMemory()
+    health = memory.health()
+
+    if health == "RISK_BLOCKED":
+        print("🧠 Sistema em estado RISK_BLOCKED. Desarmando automaticamente.")
+        config["armed"] = False
+
+    elif health == "UNSTABLE":
+        print("🧠 Sistema instável. Forçando modo OBSERVADOR.")
+        mode = "OBSERVADOR"
+
+    if mode == "VIRTUAL":
+        replay()
+        return
+
     # Escolha do broker
-    if MODE == "VIRTUAL":
+    if mode == "VIRTUAL":
         broker = VirtualBroker(config["symbols"])
 
-    elif MODE == "OBSERVADOR":
+    elif mode == "OBSERVADOR":
         broker = BybitBroker(
             config["symbols"],
-            mode=MODE,
+            mode=mode,
             armed=config.get("armed", False),
         )
 
-    elif MODE == "REAL":
+    elif mode == "REAL":
         broker = BybitBroker(
             config["symbols"],
             mode="REAL",
@@ -65,7 +78,7 @@ def main():
         risk=risk,
         store=store,
         feedback=feedback,
-        mode=MODE,
+        mode=mode,
     )
 
     engine.boot()
