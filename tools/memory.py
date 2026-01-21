@@ -13,8 +13,49 @@ class CognitiveMemory:
         with open(self.path, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    def health(self) -> str | None:
+    def recomendations(self) -> list[str]:
         data = self.load()
         if not data:
-            return None
-        return data.get("health")
+            return []
+        return data.get("recomendations", [])
+
+    def health(self) -> str:
+        data = self.load()
+        if not data:
+            return "EMPTY"
+        return data.get("health", "UNKNOWN")
+
+    def profile(self) -> str:
+        """
+        Retorna um perfil cognitivo do sistema:
+        - "PAUSED"
+        - "CONSERVATIVE"
+        - "NORMAL"
+        - "AGGRESSIVE"
+        """
+
+        data = self.load()
+
+        if not data:
+            return "NORMAL"
+
+        health = data.get("health")
+        summary = data.get("summary", {})
+
+        total = summary.get("total_events", 0)
+        blocked = summary.get("blocked", 0)
+        approved = summary.get("approved", 0)
+
+        # Estado crítico: sistema travado por risco
+        if health == "RISK_BLOCKED":
+            return "PAUSED"
+
+        # Muito bloqueio em relação ao total → conservador
+        if total > 0 and blocked / total > 0.6:
+            return "CONSERVATIVE"
+
+        # Muitas execuções reais → agressivo
+        if approved >= 10 and blocked < approved:
+            return "AGGRESSIVE"
+
+        return "NORMAL"
