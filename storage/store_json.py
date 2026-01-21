@@ -28,6 +28,18 @@ class JSONStore:
 
     def record_event(self, event: dict) -> None:
         """
+        Acrescenta o evento em um log sequencial.
+        Nunca lança exceção.
+        Nunca altera eventos anteriores.
+        """
+        try:
+            path = "storage/events.jsonl"
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        except Exception:
+            pass  # nunca quebra o robô
+
+        """
         Registra eventos operacionais:
         - decisões
         - bloqueios

@@ -1,4 +1,5 @@
 from core.state_machine import State, StateMachine
+from datetime import datetime
 
 
 class Engine:
@@ -75,14 +76,14 @@ class Engine:
         # Atualiza o mundo
         self.world.update(market_snapshot)
         world_view = self.world.snapshot()
-
         action = self.decision.decide(current, world_view)
 
         base_event = {
+            "ts": datetime.utcnow().isoformat(),
+            "mode": self.mode,
             "state": current.name,
             "world": world_view,
             "action": action,
-            "mode": self.mode,
         }
 
         if not action:
