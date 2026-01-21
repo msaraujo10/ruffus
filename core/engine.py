@@ -113,8 +113,13 @@ class Engine:
                     self.state.set(State.IN_POSITION)
                     status = "EXECUTED"
                 else:
-                    self.state.set(State.ERROR)
-                    status = "FAILED"
+                    if self.mode == "OBSERVADOR":
+                        print("[OBSERVADOR] BUY ignorado.")
+                        self.state.set(State.IDLE)
+                        status = "IGNORED"
+                    else:
+                        self.state.set(State.ERROR)
+                        status = "FAILED"
 
             elif kind == "SELL":
                 self.state.set(State.EXITING)
@@ -124,8 +129,13 @@ class Engine:
                     self.state.set(State.IDLE)
                     status = "EXECUTED"
                 else:
-                    self.state.set(State.ERROR)
-                    status = "FAILED"
+                    if self.mode == "OBSERVADOR":
+                        print("[OBSERVADOR] SELL ignorado.")
+                        self.state.set(State.IN_POSITION)
+                        status = "IGNORED"
+                    else:
+                        self.state.set(State.ERROR)
+                        status = "FAILED"
 
         except Exception:
             status = "ERROR"

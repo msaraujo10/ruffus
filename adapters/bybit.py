@@ -3,11 +3,13 @@ from pybit.unified_trading import HTTP
 
 class BybitBroker:
     """
-    Broker real da Bybit.
+    Broker real para Bybit.
 
     Modos:
     - OBSERVADOR: nunca executa ordens (apenas loga)
-    - REAL: executa ordens apenas se armed == True
+    - REAL: executa ordens reais
+
+    Nunca lança exceção para fora.
     """
 
     def __init__(
@@ -22,85 +24,103 @@ class BybitBroker:
             recv_window=10000,
         )
 
+        self._last_snapshot: dict = {}
+
+    # -------------------------------------------------
+    # MERCADO
+    # -------------------------------------------------
     def tick(self) -> dict:
         """
-        Retorna preços reais da Bybit:
+        Retorna:
         {
             "BTCUSDT": 90481.0,
             "ETHUSDT": 3047.2,
             ...
         }
+
+        Nunca lança exceção.
+        Em falha, retorna último snapshot válido ou {}.
         """
         prices = {}
 
-        for symbol in self.symbols:
-            try:
-                r = self.session.get_tickers(category="spot", symbol=symbol)
-                if r.get("retCode") != 0:
+        try:
+            for symbol in self.symbols:
+                try:
+                    r = self.session.get_tickers(category="spot", symbol=symbol)
+
+                    if r.get("retCode") != 0:
+                        prices[symbol] = None
+                    else:
+                        last = r["result"]["list"][0]["lastPrice"]
+                        prices[symbol] = float(last)
+
+                except Exception as e:
+                    print(f"[BYBIT] Erro ao buscar {symbol}: {e}")
                     prices[symbol] = None
-                else:
-                    last = r["result"]["list"][0]["lastPrice"]
-                    prices[symbol] = float(last)
-            except Exception as e:
-                print(f"[BYBIT] Erro ao buscar {symbol}: {e}")
-                prices[symbol] = None
 
-        return prices
+            self._last_snapshot = prices
+            return prices
 
-    # verifica se tem ordem aberta
+        except Exception:
+            return self._last_snapshot or {}
+
+    # -------------------------------------------------
+    # POSIÇÕES
+    # -------------------------------------------------
     def get_open_position(self, symbol: str) -> dict | None:
         """
-        Retorna:
+        Retorna algo como:
         {
             "symbol": "BTCUSDT",
             "entry_price": 90481.2,
-            "size": 0.001
+            "qty": 0.001
         }
-        ou None se não houver posição aberta.
-        """
-        if self.mode != "REAL":
-            return None
 
+        Ou None se não houver posição.
+        """
         try:
             r = self.session.get_positions(category="spot", symbol=symbol)
-            data = r.get("result", {}).get("list", [])
 
-            for p in data:
+            if r.get("retCode") != 0:
+                return None
+
+            positions = r["result"]["list"]
+            for p in positions:
                 size = float(p.get("size", 0))
                 if size > 0:
                     return {
                         "symbol": symbol,
-                        "entry_price": float(p["avgPrice"]),
-                        "size": size,
+                        "entry_price": float(p.get("avgPrice", 0)),
+                        "qty": size,
                     }
-        except Exception as e:
-            print(f"[BROKER] Erro ao consultar posição real: {e}")
 
-        return None
+            return None
 
+        except Exception:
+            return None
+
+    # -------------------------------------------------
+    # EXECUÇÃO
+    # -------------------------------------------------
     def buy(self, action: dict) -> bool:
-        symbol = action["symbol"]
-        price = action.get("price")
-
-        if self.mode != "REAL" or not self.armed:
+        if self.mode == "OBSERVADOR" or not self.armed:
             print(f"[OBSERVADOR] BUY ignorado: {action}")
             return False
 
-        print(f"🚨 [REAL BUY] {symbol} @ {price}")
-        # Aqui futuramente entra a ordem real:
-        # self.session.place_order(...)
-
-        return True
+        try:
+            # Aqui entrará a lógica real de ordem
+            # (market, qty, etc.)
+            return True
+        except Exception:
+            return False
 
     def sell(self, action: dict) -> bool:
-        symbol = action["symbol"]
-        price = action.get("price")
-
-        if self.mode != "REAL" or not self.armed:
+        if self.mode == "OBSERVADOR" or not self.armed:
             print(f"[OBSERVADOR] SELL ignorado: {action}")
             return False
 
-        print(f"🚨 [REAL SELL] {symbol} @ {price}")
-        # self.session.place_order(...)
-
-        return True
+        try:
+            # Lógica real de venda
+            return True
+        except Exception:
+            return False

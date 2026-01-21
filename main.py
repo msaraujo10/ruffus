@@ -16,6 +16,7 @@ MODE = "OBSERVADOR"  # "VIRTUAL" ou "REAL"
 
 def main():
     print(f"🧠 RUFFUS — V2 ESTÁVEL ({MODE})")
+
     config = {
         "stop_loss": -0.5,
         "take_profit": 1.2,
