@@ -1,6 +1,4 @@
-from tools.replay_analyzer import ReplayAnalyzer
+from tools.feedback import FeedbackEngine
 
-ra = ReplayAnalyzer("storage/state.json")
-
-btc_blocked = ra.filter_events(symbol="BTCUSDT", result="BLOCKED_BY_RISK")
-ra.pretty_print(btc_blocked)
+fb = FeedbackEngine("storage/events.jsonl")
+print(fb.summary())
