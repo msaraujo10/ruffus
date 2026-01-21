@@ -6,6 +6,17 @@ class FeedbackEngine:
     def __init__(self, events_path: str):
         self.events_path = events_path
 
+    def observe(self, state: str, world: dict, action: dict | None):
+        """
+        Recebe um evento em tempo real.
+        Por enquanto apenas ignora (ou loga).
+        No futuro poderá:
+        - acumular sinais
+        - detectar padrões online
+        - disparar alertas
+        """
+        pass
+
     def load_events(self) -> list[dict]:
         events = []
 
