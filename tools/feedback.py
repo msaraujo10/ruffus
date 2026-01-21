@@ -86,3 +86,72 @@ class FeedbackEngine:
             insights.append(f"O robô tentou apenas ações do tipo {action}.")
 
         return insights
+
+    def diagnose(self) -> dict:
+        """
+        Analisa o resumo dos eventos e produz um diagnóstico cognitivo do sistema.
+        Retorna um dicionário com:
+            - health
+            - problems
+            - signals
+            - recommendations
+        """
+
+        summary = self.summary()
+
+        problems = []
+        signals = []
+        recommendations = []
+
+        total = summary.get("total", 0)
+        executed = summary.get("executed", 0)
+        blocked = summary.get("blocked", 0)
+        no_action = summary.get("no_action", 0)
+
+        # Heurísticas básicas
+        if total == 0:
+            return {
+                "health": "EMPTY",
+                "problems": ["Nenhum evento registrado."],
+                "signals": ["Sistema ainda não produziu dados."],
+                "recommendations": [
+                    "Execute o robô em modo VIRTUAL para gerar histórico."
+                ],
+            }
+
+        blocked_ratio = blocked / max(total, 1)
+        executed_ratio = executed / max(total, 1)
+
+        if blocked_ratio > 0.6:
+            problems.append("Alta taxa de bloqueios por risco.")
+            signals.append("O sistema está excessivamente restritivo.")
+            recommendations.append(
+                "Revisar parâmetros do RiskManager (armed, limites)."
+            )
+
+        if executed == 0 and total > 50:
+            problems.append("Nenhuma ação executada apesar de muitos ciclos.")
+            signals.append("O robô está estagnado.")
+            recommendations.append("Testar em modo VIRTUAL com risco liberado.")
+
+        if no_action / max(total, 1) > 0.8:
+            signals.append("Grande parte dos ciclos sem decisão.")
+            recommendations.append("Aprimorar critérios do DecisionEngine.")
+
+        if executed_ratio > 0.1:
+            signals.append("O sistema está ativo e tomando decisões reais.")
+
+        # Determina saúde geral
+        if problems:
+            health = "DEGRADED"
+        elif executed > 0:
+            health = "HEALTHY"
+        else:
+            health = "IDLE"
+
+        return {
+            "health": health,
+            "problems": problems,
+            "signals": signals,
+            "recommendations": recommendations,
+        }
