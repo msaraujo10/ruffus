@@ -53,3 +53,36 @@ class FeedbackEngine:
                 summary["by_action"][kind] = summary["by_action"].get(kind, 0) + 1
 
         return summary
+
+    def interpret(self, summary: dict) -> list[str]:
+        """
+        Recebe o resumo numérico e retorna uma lista de insights humanos.
+        """
+        insights = []
+
+        total = summary.get("total_events", 0)
+        approved = summary.get("approved", 0)
+        blocked = summary.get("blocked_by_risk", 0)
+
+        by_state = summary.get("by_state", {})
+        by_action = summary.get("by_action", {})
+
+        # 1. Nenhuma ação aprovada
+        if total > 0 and approved == 0:
+            insights.append("Nenhuma ação foi aprovada no período analisado.")
+
+        # 2. Tudo bloqueado por risco
+        if total > 0 and blocked == total:
+            insights.append("Todas as ações foram bloqueadas pelo sistema de risco.")
+
+        # 3. Apenas um estado observado
+        if len(by_state) == 1:
+            state = next(iter(by_state.keys()))
+            insights.append(f"O robô permaneceu exclusivamente no estado {state}.")
+
+        # 4. Apenas um tipo de ação
+        if len(by_action) == 1:
+            action = next(iter(by_action.keys()))
+            insights.append(f"O robô tentou apenas ações do tipo {action}.")
+
+        return insights
