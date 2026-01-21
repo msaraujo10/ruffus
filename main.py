@@ -12,7 +12,7 @@ from adapters.bybit import BybitBroker
 from storage.store_json import JSONStore
 
 
-MODE = "OBSERVADOR"  # "VIRTUAL" ou "REAL"
+MODE = "VIRTUAL"  # "VIRTUAL" ou "REAL"
 
 
 def main():
