@@ -1,33 +1,29 @@
 class BaseStrategy:
     """
-    Contrato base para qualquer estratégia do RUFFUS.
+    Contrato base de toda estratégia.
+
+    Toda estratégia deve:
+    - decidir ações
+    - aceitar adaptação cognitiva
     """
 
-    def __init__(self, config: dict):
-        self.config = config
-
     def decide(self, state, world, context):
-        mode = context["mode"]
-        health = context["health"]
-        profile = context["profile"]
-
-        # exemplo de uso:
-        if mode == "PAUSED":
-            return None
-
-        if health == "RISK_BLOCKED":
-            return None
-
+        """
+        Retorna uma ação ou None.
+        """
         raise NotImplementedError
 
-    def export(self) -> dict:
+    def adapt(self, diagnosis: dict):
         """
-        Retorna o estado interno da estratégia.
-        """
-        return {}
+        Recebe o diagnóstico do sistema.
 
-    def import_state(self, data: dict):
-        """
-        Restaura o estado interno da estratégia.
+        Nesta fase:
+        - não faz nada
+        - apenas existe como contrato
+
+        Fases futuras irão:
+        - alterar parâmetros internos
+        - mudar agressividade
+        - pausar entradas
         """
         pass
