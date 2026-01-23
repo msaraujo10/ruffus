@@ -1,10 +1,13 @@
 import time
-import os, json
+import os
+import json
+
 from core.engine import Engine
 from core.state_machine import State
 from core.decision import DecisionEngine
 from core.risk import RiskManager
 from core.world import World
+
 from tools.feedback import FeedbackEngine
 from tools.memory import CognitiveMemory
 
@@ -12,16 +15,24 @@ from adapters.virtual import VirtualBroker
 from adapters.bybit import BybitBroker
 from storage.store_json import JSONStore
 
-MODE = "VIRTUAL"  # OBSERVADOR | REAL | VIRTUAL
+
+# Modo inicial apenas como “intenção de boot”
+# OBSERVADOR | REAL | VIRTUAL
+MODE = "VIRTUAL"
 
 
 def main():
-    global MODE
+    print(f"🧠 RUFFUS — V2 ESTÁVEL ({MODE})")
 
-    mode = MODE
+    # ----------------------------
+    # Diagnóstico cognitivo
+    # ----------------------------
+    memory = CognitiveMemory()
+    health = memory.health()
 
-    print(f"🧠 RUFFUS — V2 ESTÁVEL ({mode})")
-
+    # ----------------------------
+    # Configuração base
+    # ----------------------------
     config = {
         "stop_loss": -0.5,
         "take_profit": 1.2,
@@ -31,66 +42,20 @@ def main():
         "armed": True,
     }
 
-    # 🧠 CONGNIÇÃO
-    memory = CognitiveMemory()
-    health = memory.health()
-    profile = memory.profile()
-    recs = memory.recomendations()
-    print(f"🧠 Health: {health}")
-    print(f"🧠 Perfil cognitivo: {profile}")
-
-    # Regras por recomendação textual
-    for r in recs:
-        r_low = r.lower()
-        if "reduzir take profit" in r_low:
-            config["take_profit"] *= 0.8
-            print("🧠 Ajuste: take_profit reduzido.")
-
-        if "aumentar stop loss" in r_low:
-            config["stop_loss"] *= 1.2
-            print("🧠 Ajuste: stop_loss ampliado.")
-        if "revisar configuração de risco" in r_low:
-            config["armed"] = False
-            print("🧠 Ajuste: sistema desarmado por recomendação cognitiva.")
-
-    if health == "RISK_BLOCKED":
-        print("🛑 Sistema em estado RISK_BLOCKED. Desarmando automaticamente.")
-        config["armed"] = False
-
-    elif health == "UNSTABLE":
-        print("🛑 Sistema instável. Forçando modo OBSERVADOR.")
-        mode = "OBSERVADOR"
-
-    if mode == "VIRTUAL":
-        replay()
-        return
-    # Ajuste cognitivo do comportamento
-    if profile == "PAUSED":
-        config["armed"] = False
-
-    elif profile == "CONSERVATIVE":
-        config["take_profit"] = 0.6
-        config["stop_loss"] = -0.3
-
-    elif profile == "AGGRESSIVE":
-        config["take_profit"] = 2.0
-        config["stop_loss"] = -0.8
-
-    # NORMAL → mantém os valores padrão
-    memory.update_profile(profile, config)
-
-    # Escolha do broker
-    if mode == "VIRTUAL":
+    # ----------------------------
+    # Broker conforme modo inicial
+    # ----------------------------
+    if MODE == "VIRTUAL":
         broker = VirtualBroker(config["symbols"])
 
-    elif mode == "OBSERVADOR":
+    elif MODE == "OBSERVADOR":
         broker = BybitBroker(
             config["symbols"],
-            mode=mode,
+            mode="OBSERVADOR",
             armed=config.get("armed", False),
         )
 
-    elif mode == "REAL":
+    elif MODE == "REAL":
         broker = BybitBroker(
             config["symbols"],
             mode="REAL",
@@ -100,13 +65,18 @@ def main():
     else:
         raise ValueError("MODE inválido")
 
+    # ----------------------------
+    # Domínio
+    # ----------------------------
     store = JSONStore(config["store_path"])
     world = World(config["symbols"], store)
     decision = DecisionEngine(config)
     risk = RiskManager(config)
-
     feedback = FeedbackEngine("storage/events.jsonl")
 
+    # ----------------------------
+    # Engine
+    # ----------------------------
     engine = Engine(
         broker=broker,
         world=world,
@@ -114,22 +84,45 @@ def main():
         risk=risk,
         store=store,
         feedback=feedback,
-        mode=mode,
+        initial_mode=MODE,
     )
 
+    # ----------------------------
+    # Aplicação do diagnóstico
+    # ----------------------------
+    if health == "RISK_BLOCKED":
+        print("🔴 Sistema em estado RISK_BLOCKED.")
+        engine.set_mode("PAUSED")
+
+    elif health == "UNSTABLE":
+        print("🟠 Sistema instável.")
+        engine.set_mode("OBSERVADOR")
+
+    # ----------------------------
+    # Replay automático em VIRTUAL
+    # ----------------------------
+    if engine.mode == "VIRTUAL":
+        replay()
+        return
+
+    # ----------------------------
+    # Boot
+    # ----------------------------
     engine.boot()
     engine.state.set(State.IDLE)
 
+    # ----------------------------
+    # Loop principal
+    # ----------------------------
     while True:
         try:
-            feed = broker.tick()  # { "BTCUSDT": 43210.5, ... }
+            feed = broker.tick()
             world.update(feed)
 
             snapshot = world.snapshot()
             engine.tick(snapshot)
 
             store.save(snapshot)
-
             time.sleep(config["sleep"])
 
         except KeyboardInterrupt:
@@ -138,8 +131,6 @@ def main():
 
 
 def replay():
-    from storage.store_json import JSONStore
-
     print("🎞️  MODO REPLAY\n")
 
     path = "storage/events.jsonl"
