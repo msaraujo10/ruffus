@@ -6,6 +6,7 @@ from core.engine import Engine
 from core.state_machine import State
 from core.risk import RiskManager
 from core.world import World
+from core.profiles.registry import load_profile
 
 from core.strategies.registry import load_strategy
 
@@ -35,6 +36,7 @@ def main():
     # Configuração base
     # ----------------------------
     config = {
+        "profile": "moderate",
         "stop_loss": -0.5,
         "take_profit": 1.2,
         "sleep": 1,
@@ -43,7 +45,14 @@ def main():
         "armed": True,
         "strategy": "simple_trend",
     }
+    # ----------------------------
+    # Aplicação de Perfil
+    # ----------------------------
+    profile_name = config.get("profile", "moderate")
+    profile = load_profile(profile_name)
+    config = profile.apply(config)
 
+    print(f"🧬 Perfil ativo: {profile.name}")
     # ----------------------------
     # Broker conforme modo inicial
     # ----------------------------
