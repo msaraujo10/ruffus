@@ -152,24 +152,39 @@ class Engine:
             if kind == "BUY":
                 self.state.set(State.ENTERING)
                 ok = self.broker.buy(action)
+
                 if ok:
                     self.state.set(State.IN_POSITION)
                     status = "EXECUTED"
+                    self.risk.on_executed(action)
                 else:
                     self.state.set(State.ERROR)
                     status = "FAILED"
+
                 self.persist()
 
             elif kind == "SELL":
                 self.state.set(State.EXITING)
                 ok = self.broker.sell(action)
+
                 if ok:
                     self.state.set(State.POST_TRADE)
                     self.state.set(State.IDLE)
                     status = "EXECUTED"
+
+                    # Determina resultado lógico
+                    result = action.get("result") or action.get("reason")
+                    if result in ("PROFIT", "WIN"):
+                        self.risk.on_trade_result("WIN")
+                    else:
+                        self.risk.on_trade_result("LOSS")
+
+                    self.risk.on_executed(action)
+
                 else:
                     self.state.set(State.ERROR)
                     status = "FAILED"
+
                 self.persist()
 
         except Exception:
