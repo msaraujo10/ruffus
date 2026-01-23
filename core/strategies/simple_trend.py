@@ -1,42 +1,59 @@
-from core.strategies.base import BaseStrategy
 from core.state_machine import State
 
 
-class SimpleTrendStrategy(BaseStrategy):
+class SimpleTrendStrategy:
     """
-    Estratégia mínima de referência.
+    Estratégia simples baseada em tendência.
 
-    Regras:
-    - Sempre entra no primeiro símbolo disponível
-    - Sai quando atingir stop ou take
+    Agora é consciente do estado cognitivo do sistema:
+    - NORMAL
+    - DEFENSIVE
+    - SUSPENDED
     """
 
     def __init__(self, config: dict):
         self.config = config
         self.entries = {}
+        self.mode = "NORMAL"
 
-    def export(self) -> dict:
-        return {
-            "entries": dict(self.entries),
-        }
+    # ----------------------------
+    # ADAPTAÇÃO COGNITIVA
+    # ----------------------------
+    def adapt(self, diagnosis: dict) -> None:
+        health = diagnosis.get("health", "OK")
 
-    def import_state(self, data: dict | None):
-        if not data:
-            return
-        self.entries = dict(data.get("entries", {}))
+        if health == "RISK_BLOCKED":
+            self.mode = "SUSPENDED"
 
-    def adapt(self, diagnosis: dict):
+        elif health == "UNSTABLE":
+            self.mode = "DEFENSIVE"
 
-        pass
+        else:
+            self.mode = "NORMAL"
 
-    def decide(self, world: dict, state):
-        prices = world["prices"]
+    # ----------------------------
+    # DECISÃO
+    # ----------------------------
+    def decide(self, state: State, world: dict, context: dict | None = None):
+        prices = world.get("prices", {})
 
-        # Entrada
-        if state.name == "IDLE":
+        # Modo SUSPENDED: nunca entrar
+        if self.mode == "SUSPENDED":
+            return None
+
+        # Estado ocioso → procurar entrada
+        if state == State.IDLE:
             for symbol, price in prices.items():
                 if price is None:
                     continue
+
+                # DEFENSIVE: exigir "sinal mais forte"
+                if self.mode == "DEFENSIVE":
+                    if not self.should_enter_defensive(symbol, price):
+                        continue
+                else:
+                    if not self.should_enter(symbol, price):
+                        continue
 
                 self.entries[symbol] = price
                 return {
@@ -45,11 +62,11 @@ class SimpleTrendStrategy(BaseStrategy):
                     "price": price,
                 }
 
-        # Saída
-        if state.name == "IN_POSITION":
+        # Em posição → gerenciar saída
+        if state == State.IN_POSITION:
             for symbol, entry in list(self.entries.items()):
                 price = prices.get(symbol)
-                if not price:
+                if price is None:
                     continue
 
                 change = ((price - entry) / entry) * 100
@@ -71,3 +88,14 @@ class SimpleTrendStrategy(BaseStrategy):
                     }
 
         return None
+
+    # ----------------------------
+    # HEURÍSTICAS
+    # ----------------------------
+    def should_enter(self, symbol: str, price: float) -> bool:
+        return True
+
+    def should_enter_defensive(self, symbol: str, price: float) -> bool:
+        # Versão conservadora: hoje só reutiliza a mesma lógica,
+        # mas no futuro pode exigir volume, candle, etc.
+        return True
