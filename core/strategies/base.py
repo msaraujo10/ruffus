@@ -6,22 +6,18 @@ class BaseStrategy:
     def __init__(self, config: dict):
         self.config = config
 
-    def decide(self, world: dict, state):
-        """
-        Recebe:
-            world -> snapshot do mundo
-            state -> estado atual do Engine
+    def decide(self, state, world, context):
+        mode = context["mode"]
+        health = context["health"]
+        profile = context["profile"]
 
-        Retorna:
-            None
-            ou
-            {
-                "type": "BUY" | "SELL",
-                "symbol": str,
-                "price": float,
-                "reason": str,
-            }
-        """
+        # exemplo de uso:
+        if mode == "PAUSED":
+            return None
+
+        if health == "RISK_BLOCKED":
+            return None
+
         raise NotImplementedError
 
     def export(self) -> dict:
