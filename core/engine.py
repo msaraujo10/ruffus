@@ -89,6 +89,35 @@ class Engine:
     # CICLO PRINCIPAL
     # -------------------------------------------------
     def tick(self, market_snapshot: dict):
+        # -------------------------------------------------
+        # AUTO-REGULAÇÃO DE MODO (FASE 16.1)
+        # -------------------------------------------------
+        health = self.feedback.health() if self.feedback else "OK"
+
+        # Sistema instável → OBSERVADOR
+        if health == "UNSTABLE" and self.mode != "OBSERVADOR":
+            print("🧠 [ENGINE] Sistema instável. Mudando para OBSERVADOR.")
+            self.set_mode("OBSERVADOR")
+
+        # Risco bloqueado → PAUSED
+        if hasattr(self.risk, "is_blocked") and self.risk.is_blocked():
+            if self.mode != "PAUSED":
+                print("🛑 [ENGINE] Risco bloqueado. Mudando para PAUSED.")
+                self.set_mode("PAUSED")
+
+        # Em PAUSED não há execução alguma
+        if self.mode == "PAUSED":
+            self.store.record_event(
+                {
+                    "state": self.state.current().name,
+                    "world": self.world.snapshot(),
+                    "action": None,
+                    "mode": self.mode,
+                    "result": "PAUSED",
+                }
+            )
+            return
+
         current = self.state.current()
 
         # Atualiza o mundo
