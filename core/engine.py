@@ -4,18 +4,37 @@ from core.state_machine import State, StateMachine
 class Engine:
     """
     Orquestrador central do sistema.
+
+    Responsabilidades:
+    - coordenar StateMachine, World, DecisionEngine e RiskManager
+    - restaurar o estado persistido no boot
+    - executar ações aprovadas
+    - persistir snapshots consistentes após cada mutação
+    - manter e controlar o modo global (VIRTUAL / OBSERVADOR / REAL / PAUSED)
     """
 
-    def __init__(self, broker, world, decision, risk, store, feedback, mode: str):
+    def __init__(
+        self, broker, world, decision, risk, store, feedback, initial_mode: str
+    ):
         self.broker = broker
         self.world = world
         self.decision = decision
         self.risk = risk
         self.store = store
         self.feedback = feedback
-        self.mode = mode
+
+        self.initial_mode = initial_mode
+        self.mode = initial_mode
 
         self.state = StateMachine()
+
+    # -------------------------------------------------
+    # CONTROLE DE MODO
+    # -------------------------------------------------
+    def set_mode(self, mode: str):
+        self.mode = mode
+        print(f"🧠 Modo alterado para: {self.mode}")
+        self.persist()
 
     # -------------------------------------------------
     # BOOT
@@ -25,12 +44,47 @@ class Engine:
 
         data = self.store.load() or {}
 
-        self.state.import_state(data.get("state"))
-        self.world.import_state(data.get("world"))
-        self.decision.import_state(data.get("decision"))
+        # Restaura State
+        raw_state = data.get("state")
+        if isinstance(raw_state, str):
+            try:
+                self.state.set(State[raw_state])
+            except Exception:
+                self.state.set(State.IDLE)
+
+        # Restaura World
+        world_data = data.get("world")
+        if isinstance(world_data, dict):
+            self.world.import_state(world_data)
+
+        # Restaura Decision
+        decision_data = data.get("decision")
+        if isinstance(decision_data, dict):
+            self.decision.import_state(decision_data)
+
+        # Restaura modo, se existir
+        if isinstance(data, dict) and "mode" in data:
+            self.mode = data["mode"]
+            print(f"🧠 Modo restaurado: {self.mode}")
+        else:
+            self.mode = self.initial_mode
+            print(f"🆕 Modo inicial aplicado: {self.mode}")
+
+        # Sincronização REAL
+        if self.mode == "REAL":
+            for symbol in self.world.symbols:
+                pos = self.broker.get_open_position(symbol)
+                if pos:
+                    print(f"🔗 Posição real detectada em {symbol}. Sincronizando.")
+                    self.decision.entries[symbol] = pos["entry_price"]
+                    self.state.set(State.IN_POSITION)
+                    self.persist()
+                    return
 
         if self.state.current() == State.BOOT:
             self.state.set(State.IDLE)
+
+        self.persist()
 
     # -------------------------------------------------
     # CICLO PRINCIPAL
@@ -38,22 +92,32 @@ class Engine:
     def tick(self, market_snapshot: dict):
         current = self.state.current()
 
+        # Atualiza o mundo
         self.world.update(market_snapshot)
-        world_view = self.world.snapshot()
 
+        world_view = self.world.snapshot()
         action = self.decision.decide(current, world_view)
 
-        # Feedback passivo
-        self.feedback.observe(
-            state=current.name,
-            world=world_view,
-            action=action,
-        )
+        base_event = {
+            "state": current.name,
+            "world": world_view,
+            "action": action,
+            "mode": self.mode,
+        }
 
         if not action:
+            self.store.record_event({**base_event, "result": "NO_ACTION"})
             return
 
         if not self.risk.allow(current, action):
+            self.store.record_event({**base_event, "result": "BLOCKED_BY_RISK"})
+            return
+
+        self.store.record_event({**base_event, "result": "APPROVED"})
+
+        # Regra global
+        if current == State.IN_POSITION and action["type"] == "BUY":
+            print("⛔ BUY bloqueado: já existe posição aberta.")
             return
 
         self.execute(action)
@@ -63,6 +127,7 @@ class Engine:
     # -------------------------------------------------
     def execute(self, action: dict):
         kind = action["type"]
+        status = "UNKNOWN"
 
         try:
             if kind == "BUY":
@@ -70,8 +135,10 @@ class Engine:
                 ok = self.broker.buy(action)
                 if ok:
                     self.state.set(State.IN_POSITION)
+                    status = "EXECUTED"
                 else:
                     self.state.set(State.ERROR)
+                    status = "FAILED"
 
             elif kind == "SELL":
                 self.state.set(State.EXITING)
@@ -79,22 +146,35 @@ class Engine:
                 if ok:
                     self.state.set(State.POST_TRADE)
                     self.state.set(State.IDLE)
+                    status = "EXECUTED"
                 else:
                     self.state.set(State.ERROR)
+                    status = "FAILED"
 
         except Exception:
+            status = "ERROR"
             self.state.set(State.ERROR)
+
+        self.store.record_trade(
+            {
+                "action": action,
+                "status": status,
+                "mode": self.mode,
+                "state": self.state.current().name,
+            }
+        )
 
         self.persist()
 
     # -------------------------------------------------
-    # PERSISTÊNCIA
+    # PERSISTÊNCIA CENTRAL
     # -------------------------------------------------
     def persist(self):
         snapshot = {
             "state": self.state.current().name,
             "world": self.world.export(),
             "decision": self.decision.export(),
+            "mode": self.mode,
         }
 
         self.store.save(snapshot)
