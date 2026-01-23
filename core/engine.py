@@ -13,6 +13,7 @@ class Engine:
     - executar ações aprovadas
     - persistir snapshots consistentes após cada mutação
     - manter e controlar o modo global (VIRTUAL / OBSERVADOR / REAL / PAUSED)
+    - propagar diagnósticos cognitivos para a estratégia
     """
 
     def __init__(self, broker, world, strategy, risk, store, feedback, mode: str):
@@ -57,8 +58,13 @@ class Engine:
         if isinstance(world_data, dict):
             self.world.import_state(world_data)
 
-        # Restaura modo, se existir
-        if isinstance(data, dict) and "mode" in data:
+        # Restaura Strategy
+        strategy_data = data.get("strategy")
+        if isinstance(strategy_data, dict):
+            self.strategy.import_state(strategy_data)
+
+        # Restaura modo
+        if "mode" in data:
             self.mode = data["mode"]
             print(f"🧠 Modo restaurado: {self.mode}")
         else:
@@ -70,7 +76,8 @@ class Engine:
             for symbol in self.world.symbols:
                 pos = self.broker.get_open_position(symbol)
                 if pos:
-                    print(f"🔗 Posição real detectada em {symbol}.")
+                    print(f"🔗 Posição real detectada em {symbol}. Sincronizando.")
+                    self.strategy.restore_position(symbol, pos)
                     self.state.set(State.IN_POSITION)
                     self.persist()
                     return
@@ -123,6 +130,14 @@ class Engine:
             return
 
         self.execute(action)
+
+        # ------------------------------
+        # DIAGNÓSTICO + ADAPTAÇÃO
+        # ------------------------------
+        if self.feedback:
+            diagnosis = self.feedback.diagnose()
+            if diagnosis:
+                self.strategy.adapt(diagnosis)
 
     # -------------------------------------------------
     # EXECUÇÃO
@@ -177,6 +192,7 @@ class Engine:
         snapshot = {
             "state": self.state.current().name,
             "world": self.world.export(),
+            "strategy": self.strategy.export(),
             "mode": self.mode,
         }
 

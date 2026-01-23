@@ -1,4 +1,5 @@
 from core.strategies.base import BaseStrategy
+from core.state_machine import State
 
 
 class SimpleTrendStrategy(BaseStrategy):
@@ -23,6 +24,10 @@ class SimpleTrendStrategy(BaseStrategy):
         if not data:
             return
         self.entries = dict(data.get("entries", {}))
+
+    def adapt(self, diagnosis: dict):
+
+        pass
 
     def decide(self, world: dict, state):
         prices = world["prices"]
