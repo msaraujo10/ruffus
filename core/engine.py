@@ -1,5 +1,3 @@
-# core/engine.py
-
 from core.state_machine import State, StateMachine
 
 
@@ -13,7 +11,7 @@ class Engine:
     - executar ações aprovadas
     - persistir snapshots consistentes após cada mutação
     - manter e controlar o modo global (VIRTUAL / OBSERVADOR / REAL / PAUSED)
-    - propagar diagnósticos cognitivos para a estratégia
+    - alimentar a estratégia com histórico e diagnóstico (aprendizado contínuo)
     """
 
     def __init__(self, broker, world, strategy, risk, store, feedback, mode: str):
@@ -59,12 +57,12 @@ class Engine:
             self.world.import_state(world_data)
 
         # Restaura Strategy
-        strategy_data = data.get("strategy")
-        if isinstance(strategy_data, dict):
-            self.strategy.import_state(strategy_data)
+        strat_data = data.get("strategy")
+        if isinstance(strat_data, dict):
+            self.strategy.import_state(strat_data)
 
-        # Restaura modo
-        if "mode" in data:
+        # Restaura modo, se existir
+        if isinstance(data, dict) and "mode" in data:
             self.mode = data["mode"]
             print(f"🧠 Modo restaurado: {self.mode}")
         else:
@@ -77,7 +75,7 @@ class Engine:
                 pos = self.broker.get_open_position(symbol)
                 if pos:
                     print(f"🔗 Posição real detectada em {symbol}. Sincronizando.")
-                    self.strategy.restore_position(symbol, pos)
+                    self.strategy.on_sync(symbol, pos["entry_price"])
                     self.state.set(State.IN_POSITION)
                     self.persist()
                     return
@@ -95,9 +93,16 @@ class Engine:
 
         # Atualiza o mundo
         self.world.update(market_snapshot)
-
         world_view = self.world.snapshot()
 
+        # 🧠 Consciência do sistema
+        if self.feedback:
+            diagnosis = self.feedback.diagnose()
+            self.strategy.adapt(diagnosis)
+
+        action = self.strategy.decide(current, world_view, context=None)
+
+        # Contexto cognitivo para a estratégia
         context = {
             "mode": self.mode,
             "health": self.feedback.health() if self.feedback else None,
@@ -105,6 +110,7 @@ class Engine:
             "last_action": self.feedback.last_action() if self.feedback else None,
         }
 
+        # Decisão
         action = self.strategy.decide(current, world_view, context)
 
         base_event = {
@@ -116,10 +122,12 @@ class Engine:
 
         if not action:
             self.store.record_event({**base_event, "result": "NO_ACTION"})
+            self._learn_and_adapt()
             return
 
         if not self.risk.allow(current, action):
             self.store.record_event({**base_event, "result": "BLOCKED_BY_RISK"})
+            self._learn_and_adapt()
             return
 
         self.store.record_event({**base_event, "result": "APPROVED"})
@@ -127,17 +135,11 @@ class Engine:
         # Regra global
         if current == State.IN_POSITION and action["type"] == "BUY":
             print("⛔ BUY bloqueado: já existe posição aberta.")
+            self._learn_and_adapt()
             return
 
         self.execute(action)
-
-        # ------------------------------
-        # DIAGNÓSTICO + ADAPTAÇÃO
-        # ------------------------------
-        if self.feedback:
-            diagnosis = self.feedback.diagnose()
-            if diagnosis:
-                self.strategy.adapt(diagnosis)
+        self._learn_and_adapt()
 
     # -------------------------------------------------
     # EXECUÇÃO
@@ -184,6 +186,22 @@ class Engine:
         )
 
         self.persist()
+
+    # -------------------------------------------------
+    # APRENDIZADO CONTÍNUO
+    # -------------------------------------------------
+    def _learn_and_adapt(self):
+        # Aprendizado por histórico
+        if hasattr(self.store, "read_events"):
+            events = self.store.read_events(limit=50)
+            if events:
+                self.strategy.learn(events)
+
+        # Adaptação por diagnóstico
+        if self.feedback:
+            diagnosis = self.feedback.diagnose()
+            if diagnosis:
+                self.strategy.adapt(diagnosis)
 
     # -------------------------------------------------
     # PERSISTÊNCIA CENTRAL
