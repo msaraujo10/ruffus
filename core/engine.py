@@ -1,3 +1,5 @@
+# core/engine.py
+
 from core.state_machine import State, StateMachine
 
 
@@ -6,7 +8,7 @@ class Engine:
     Orquestrador central do sistema.
 
     Responsabilidades:
-    - coordenar StateMachine, World, DecisionEngine e RiskManager
+    - coordenar StateMachine, World, Strategy e RiskManager
     - restaurar o estado persistido no boot
     - executar ações aprovadas
     - persistir snapshots consistentes após cada mutação
@@ -55,11 +57,6 @@ class Engine:
         if isinstance(world_data, dict):
             self.world.import_state(world_data)
 
-        # Restaura Decision
-        decision_data = data.get("decision")
-        if isinstance(decision_data, dict):
-            self.decision.import_state(decision_data)
-
         # Restaura modo, se existir
         if isinstance(data, dict) and "mode" in data:
             self.mode = data["mode"]
@@ -73,8 +70,7 @@ class Engine:
             for symbol in self.world.symbols:
                 pos = self.broker.get_open_position(symbol)
                 if pos:
-                    print(f"🔗 Posição real detectada em {symbol}. Sincronizando.")
-                    self.decision.entries[symbol] = pos["entry_price"]
+                    print(f"🔗 Posição real detectada em {symbol}.")
                     self.state.set(State.IN_POSITION)
                     self.persist()
                     return
@@ -94,7 +90,15 @@ class Engine:
         self.world.update(market_snapshot)
 
         world_view = self.world.snapshot()
-        action = self.strategy.decide(current, world_view)
+
+        context = {
+            "mode": self.mode,
+            "health": self.feedback.health() if self.feedback else None,
+            "profile": self.feedback.profile() if self.feedback else None,
+            "last_action": self.feedback.last_action() if self.feedback else None,
+        }
+
+        action = self.strategy.decide(current, world_view, context)
 
         base_event = {
             "state": current.name,
@@ -173,7 +177,6 @@ class Engine:
         snapshot = {
             "state": self.state.current().name,
             "world": self.world.export(),
-            "decision": self.decision.export(),
             "mode": self.mode,
         }
 
