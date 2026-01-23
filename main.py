@@ -4,9 +4,10 @@ import json
 
 from core.engine import Engine
 from core.state_machine import State
-from core.decision import DecisionEngine
 from core.risk import RiskManager
 from core.world import World
+
+from core.strategies.registry import load_strategy
 
 from tools.feedback import FeedbackEngine
 from tools.memory import CognitiveMemory
@@ -40,6 +41,7 @@ def main():
         "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
         "store_path": "storage/state.json",
         "armed": True,
+        "strategy": "simple_trend",
     }
 
     # ----------------------------
@@ -70,7 +72,7 @@ def main():
     # ----------------------------
     store = JSONStore(config["store_path"])
     world = World(config["symbols"], store)
-    decision = DecisionEngine(config)
+    strategy = load_strategy(config.get("strategy", "simple_trend"), config)
     risk = RiskManager(config)
     feedback = FeedbackEngine("storage/events.jsonl")
 
@@ -80,11 +82,11 @@ def main():
     engine = Engine(
         broker=broker,
         world=world,
-        decision=decision,
+        strategy=strategy,
         risk=risk,
         store=store,
         feedback=feedback,
-        initial_mode=MODE,
+        mode=MODE,
     )
 
     # ----------------------------

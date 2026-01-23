@@ -13,18 +13,16 @@ class Engine:
     - manter e controlar o modo global (VIRTUAL / OBSERVADOR / REAL / PAUSED)
     """
 
-    def __init__(
-        self, broker, world, decision, risk, store, feedback, initial_mode: str
-    ):
+    def __init__(self, broker, world, strategy, risk, store, feedback, mode: str):
         self.broker = broker
         self.world = world
-        self.decision = decision
+        self.strategy = strategy
         self.risk = risk
         self.store = store
         self.feedback = feedback
 
-        self.initial_mode = initial_mode
-        self.mode = initial_mode
+        self.initial_mode = mode
+        self.mode = mode
 
         self.state = StateMachine()
 
@@ -96,7 +94,7 @@ class Engine:
         self.world.update(market_snapshot)
 
         world_view = self.world.snapshot()
-        action = self.decision.decide(current, world_view)
+        action = self.strategy.decide(current, world_view)
 
         base_event = {
             "state": current.name,
@@ -139,6 +137,7 @@ class Engine:
                 else:
                     self.state.set(State.ERROR)
                     status = "FAILED"
+                self.persist()
 
             elif kind == "SELL":
                 self.state.set(State.EXITING)
@@ -150,6 +149,7 @@ class Engine:
                 else:
                     self.state.set(State.ERROR)
                     status = "FAILED"
+                self.persist()
 
         except Exception:
             status = "ERROR"
