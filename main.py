@@ -12,6 +12,7 @@ from core.strategies.registry import load_strategy
 
 from tools.feedback import FeedbackEngine
 from tools.memory import CognitiveMemory
+from tools.panel import ControlPanel
 
 from adapters.virtual import VirtualBroker
 from adapters.bybit import BybitBroker
@@ -122,6 +123,8 @@ def main():
     engine.boot()
     engine.state.set(State.IDLE)
 
+    panel = ControlPanel()
+
     # ----------------------------
     # Loop principal
     # ----------------------------
@@ -132,7 +135,7 @@ def main():
 
             snapshot = world.snapshot()
             engine.tick(snapshot)
-
+            panel.render(engine, world, feedback)
             store.save(snapshot)
             time.sleep(config["sleep"])
 
