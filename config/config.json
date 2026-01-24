@@ -1,6 +1,6 @@
 {
-  "mode": "OBSERVADOR",
-  "armed": false,
+  "mode": "VIRTUAL",
+  "armed": true,
   "stop_loss": -0.5,
   "take_profit": 1.2,
   "sleep": 1,

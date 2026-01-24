@@ -34,39 +34,29 @@ class SimpleTrendStrategy:
     # ----------------------------
     # DECISÃO
     # ----------------------------
-    def decide(self, state: State, world: dict, context: dict | None = None):
-        prices = world.get("prices", {})
+    def decide(self, state, world, context):
+        mode = context.get("mode")
 
-        # Modo SUSPENDED: nunca entrar
-        if self.mode == "SUSPENDED":
+        # Consciência de regime
+        if mode in ("PAUSED", "OBSERVADOR"):
             return None
 
-        # Estado ocioso → procurar entrada
+        prices = world["prices"]
+
         if state == State.IDLE:
             for symbol, price in prices.items():
-                if price is None:
-                    continue
+                if self.should_enter(symbol, price):
+                    self.entries[symbol] = price
+                    return {
+                        "type": "BUY",
+                        "symbol": symbol,
+                        "price": price,
+                    }
 
-                # DEFENSIVE: exigir "sinal mais forte"
-                if self.mode == "DEFENSIVE":
-                    if not self.should_enter_defensive(symbol, price):
-                        continue
-                else:
-                    if not self.should_enter(symbol, price):
-                        continue
-
-                self.entries[symbol] = price
-                return {
-                    "type": "BUY",
-                    "symbol": symbol,
-                    "price": price,
-                }
-
-        # Em posição → gerenciar saída
         if state == State.IN_POSITION:
             for symbol, entry in list(self.entries.items()):
                 price = prices.get(symbol)
-                if price is None:
+                if not price:
                     continue
 
                 change = ((price - entry) / entry) * 100

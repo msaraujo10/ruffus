@@ -89,6 +89,19 @@ class Engine:
     # CICLO PRINCIPAL
     # -------------------------------------------------
     def tick(self, market_snapshot: dict):
+        # Auto-regulação cognitiva
+        if self.feedback:
+            health = self.feedback.health()
+
+            if health == "RISK_BLOCKED" and self.mode != "PAUSED":
+                self.set_mode("PAUSED")
+
+            elif health == "UNSTABLE" and self.mode == "REAL":
+                self.set_mode("OBSERVADOR")
+
+            elif health == "OK" and self.mode != self.initial_mode:
+                self.set_mode(self.initial_mode)
+
         # -------------------------------------------------
         # AUTO-REGULAÇÃO DE MODO (FASE 16.1)
         # -------------------------------------------------
@@ -130,6 +143,22 @@ class Engine:
             self.strategy.adapt(diagnosis)
 
         action = self.strategy.decide(current, world_view, context=None)
+
+        # -------------------------------------------------
+        # RECUPERAÇÃO AUTOMÁTICA DE MODO (FASE 16.2)
+        # -------------------------------------------------
+
+        # Recuperação de PAUSED
+        if self.mode == "PAUSED":
+            blocked = hasattr(self.risk, "is_blocked") and self.risk.is_blocked()
+            if not blocked and health == "OK":
+                print("🟢 [ENGINE] Sistema recuperado. Retornando ao modo inicial.")
+                self.set_mode(self.initial_mode)
+
+        # Recuperação de OBSERVADOR
+        if self.mode == "OBSERVADOR" and health == "OK":
+            print("🟢 [ENGINE] Sistema estabilizado. Retornando ao modo inicial.")
+            self.set_mode(self.initial_mode)
 
         # Contexto cognitivo para a estratégia
         context = {
