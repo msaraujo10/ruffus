@@ -1,16 +1,18 @@
 from core.state_machine import State
-from .base import Strategy
+from .base import BaseStrategy
 
 
-class AlwaysBuyStrategy(Strategy):
+class AlwaysBuyStrategy(BaseStrategy):
     name = "always_buy"
 
     def __init__(self, config: dict):
         self.config = config
         self.entries: dict[str, float] = {}
 
-    def decide(self, state: State, world: dict) -> dict | None:
-        prices = world["prices"]
+    def decide(
+        self, state: State, world: dict, context: dict | None = None
+    ) -> dict | None:
+        prices = world.get("prices", {})
 
         # Entrada
         if state == State.IDLE:
