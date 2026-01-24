@@ -3,12 +3,12 @@ from enum import Enum, auto
 
 class State(Enum):
     BOOT = auto()
-    SYNC = auto()
     IDLE = auto()
     ENTERING = auto()
     IN_POSITION = auto()
     EXITING = auto()
     POST_TRADE = auto()
+    AWAIT_CONFIRMATION = auto()
     ERROR = auto()
 
 

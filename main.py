@@ -7,12 +7,11 @@ from core.state_machine import State
 from core.risk import RiskManager
 from core.world import World
 from core.profiles.registry import load_profile
-
 from core.strategies.registry import load_strategy
 
 from tools.feedback import FeedbackEngine
 from tools.memory import CognitiveMemory
-from tools.panel import ControlPanel
+from tools.panel import Panel
 
 from adapters.virtual import VirtualBroker
 from adapters.bybit import BybitBroker
@@ -20,8 +19,8 @@ from storage.store_json import JSONStore
 
 
 # Modo inicial apenas como “intenção de boot”
-# OBSERVADOR | REAL | VIRTUAL
-MODE = "VIRTUAL"
+# OBSERVADOR | REAL | VIRTUAL | ASSISTED
+MODE = "OBSERVADOR"
 
 
 def main():
@@ -46,6 +45,7 @@ def main():
         "armed": True,
         "strategy": "simple_trend",
     }
+
     # ----------------------------
     # Aplicação de Perfil
     # ----------------------------
@@ -54,6 +54,7 @@ def main():
     config = profile.apply(config)
 
     print(f"🧬 Perfil ativo: {profile.name}")
+
     # ----------------------------
     # Broker conforme modo inicial
     # ----------------------------
@@ -67,7 +68,7 @@ def main():
             armed=config.get("armed", False),
         )
 
-    elif MODE == "REAL":
+    elif MODE in ("REAL", "ASSISTED"):
         broker = BybitBroker(
             config["symbols"],
             mode="REAL",
@@ -121,9 +122,11 @@ def main():
     # Boot
     # ----------------------------
     engine.boot()
-    engine.state.set(State.IDLE)
 
-    panel = ControlPanel()
+    # ----------------------------
+    # Painel
+    # ----------------------------
+    panel = Panel(engine)
 
     # ----------------------------
     # Loop principal
@@ -131,12 +134,19 @@ def main():
     while True:
         try:
             feed = broker.tick()
-            world.update(feed)
 
-            snapshot = world.snapshot()
-            engine.tick(snapshot)
-            panel.render(engine, world, feedback)
-            store.save(snapshot)
+            engine.step(feed)
+            panel.render()
+
+            # Operação assistida
+            if engine.state.current().name == "AWAIT_CONFIRMATION":
+                cmd = input("Confirmar [c] / Cancelar [x]: ").strip().lower()
+
+                if cmd == "c":
+                    engine.confirm()
+                elif cmd == "x":
+                    engine.cancel()
+
             time.sleep(config["sleep"])
 
         except KeyboardInterrupt:

@@ -36,7 +36,6 @@ class FeedbackEngine:
     # RESUMO
     # -------------------------------------------------
     def summary(self, events: list[dict]) -> dict:
-
         buys = 0
         sells = 0
         blocked = 0
@@ -100,13 +99,8 @@ class FeedbackEngine:
 
         metrics = {
             "block_rate": summary.get("blocked", 0) / total,
-            "approval_rate": (
-                summary.get("approved", 0) / total if "approved" in summary else 0.0
-            ),
             "buy_ratio": summary.get("buys", 0) / total,
-            "sell_ratio": (
-                summary.get("sells", 0) / total if "sells" in summary else 0.0
-            ),
+            "sell_ratio": summary.get("sells", 0) / total,
             "error_rate": summary.get("errors", 0) / total,
         }
 
@@ -123,6 +117,37 @@ class FeedbackEngine:
         self.persist_memory(diagnosis)
 
         return diagnosis
+
+    # -------------------------------------------------
+    # CONTRATO COGNITIVO (FASE 18)
+    # -------------------------------------------------
+    def health(self) -> str:
+        """
+        Retorna apenas o estado de saúde atual.
+        """
+        try:
+            diag = self.diagnose()
+            return diag.get("health", "OK")
+        except Exception:
+            return "OK"
+
+    def profile(self):
+        """
+        Retorna informações de perfil cognitivo se existirem.
+        (Reservado para fases futuras.)
+        """
+        return None
+
+    def last_action(self):
+        """
+        Retorna a última ação registrada no sistema.
+        """
+        events = self.read_events(limit=1)
+        if not events:
+            return None
+
+        e = events[-1]
+        return e.get("action")
 
     # -------------------------------------------------
     # MEMÓRIA COGNITIVA

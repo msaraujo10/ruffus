@@ -1,0 +1,290 @@
+from core.state_machine import State, StateMachine
+
+
+class Engine:
+    """
+    Orquestrador central do sistema.
+
+    Responsabilidades:
+    - coordenar StateMachine, World, Strategy e RiskManager
+    - restaurar o estado persistido no boot
+    - executar ações aprovadas
+    - persistir snapshots consistentes após cada mutação
+    - manter e controlar o modo global (VIRTUAL / OBSERVADOR / REAL / PAUSED)
+    - alimentar a estratégia com histórico e diagnóstico (aprendizado contínuo)
+    """
+
+    def __init__(self, broker, world, strategy, risk, store, feedback, mode: str):
+        self.broker = broker
+        self.world = world
+        self.strategy = strategy
+        self.risk = risk
+        self.store = store
+        self.feedback = feedback
+
+        self.initial_mode = mode
+        self.mode = mode
+
+        self.state = StateMachine()
+
+    # -------------------------------------------------
+    # CONTROLE DE MODO
+    # -------------------------------------------------
+    def set_mode(self, mode: str):
+        self.mode = mode
+        print(f"🧠 Modo alterado para: {self.mode}")
+        self.persist()
+
+    # -------------------------------------------------
+    # BOOT
+    # -------------------------------------------------
+    def boot(self):
+        print("🔄 Restaurando estado persistido.")
+
+        data = self.store.load() or {}
+
+        # Restaura State
+        raw_state = data.get("state")
+        if isinstance(raw_state, str):
+            try:
+                self.state.set(State[raw_state])
+            except Exception:
+                self.state.set(State.IDLE)
+
+        # Restaura World
+        world_data = data.get("world")
+        if isinstance(world_data, dict):
+            self.world.import_state(world_data)
+
+        # Restaura Strategy
+        strat_data = data.get("strategy")
+        if isinstance(strat_data, dict):
+            self.strategy.import_state(strat_data)
+
+        # Restaura modo, se existir
+        if isinstance(data, dict) and "mode" in data:
+            self.mode = data["mode"]
+            print(f"🧠 Modo restaurado: {self.mode}")
+        else:
+            self.mode = self.initial_mode
+            print(f"🆕 Modo inicial aplicado: {self.mode}")
+
+        # Sincronização REAL
+        if self.mode == "REAL":
+            for symbol in self.world.symbols:
+                pos = self.broker.get_open_position(symbol)
+                if pos:
+                    print(f"🔗 Posição real detectada em {symbol}. Sincronizando.")
+                    self.strategy.on_sync(symbol, pos["entry_price"])
+                    self.state.set(State.IN_POSITION)
+                    self.persist()
+                    return
+
+        if self.state.current() == State.BOOT:
+            self.state.set(State.IDLE)
+
+        self.persist()
+
+    # -------------------------------------------------
+    # CICLO PRINCIPAL
+    # -------------------------------------------------
+    def tick(self, market_snapshot: dict):
+        # Auto-regulação cognitiva
+        if self.feedback:
+            health = self.feedback.health()
+
+            if health == "RISK_BLOCKED" and self.mode != "PAUSED":
+                self.set_mode("PAUSED")
+
+            elif health == "UNSTABLE" and self.mode == "REAL":
+                self.set_mode("OBSERVADOR")
+
+            elif health == "OK" and self.mode != self.initial_mode:
+                self.set_mode(self.initial_mode)
+
+        # -------------------------------------------------
+        # AUTO-REGULAÇÃO DE MODO (FASE 16.1)
+        # -------------------------------------------------
+        health = self.feedback.health() if self.feedback else "OK"
+
+        # Sistema instável → OBSERVADOR
+        if health == "UNSTABLE" and self.mode != "OBSERVADOR":
+            print("🧠 [ENGINE] Sistema instável. Mudando para OBSERVADOR.")
+            self.set_mode("OBSERVADOR")
+
+        # Risco bloqueado → PAUSED
+        if hasattr(self.risk, "is_blocked") and self.risk.is_blocked():
+            if self.mode != "PAUSED":
+                print("🛑 [ENGINE] Risco bloqueado. Mudando para PAUSED.")
+                self.set_mode("PAUSED")
+
+        # Em PAUSED não há execução alguma
+        if self.mode == "PAUSED":
+            self.store.record_event(
+                {
+                    "state": self.state.current().name,
+                    "world": self.world.snapshot(),
+                    "action": None,
+                    "mode": self.mode,
+                    "result": "PAUSED",
+                }
+            )
+            return
+
+        current = self.state.current()
+
+        # Atualiza o mundo
+        self.world.update(market_snapshot)
+        world_view = self.world.snapshot()
+
+        # 🧠 Consciência do sistema
+        if self.feedback:
+            diagnosis = self.feedback.diagnose()
+            self.strategy.adapt(diagnosis)
+
+        action = self.strategy.decide(current, world_view, context=None)
+
+        # -------------------------------------------------
+        # RECUPERAÇÃO AUTOMÁTICA DE MODO (FASE 16.2)
+        # -------------------------------------------------
+
+        # Recuperação de PAUSED
+        if self.mode == "PAUSED":
+            blocked = hasattr(self.risk, "is_blocked") and self.risk.is_blocked()
+            if not blocked and health == "OK":
+                print("🟢 [ENGINE] Sistema recuperado. Retornando ao modo inicial.")
+                self.set_mode(self.initial_mode)
+
+        # Recuperação de OBSERVADOR
+        if self.mode == "OBSERVADOR" and health == "OK":
+            print("🟢 [ENGINE] Sistema estabilizado. Retornando ao modo inicial.")
+            self.set_mode(self.initial_mode)
+
+        # Contexto cognitivo para a estratégia
+        context = {
+            "mode": self.mode,
+            "health": self.feedback.health() if self.feedback else None,
+            "profile": self.feedback.profile() if self.feedback else None,
+            "last_action": self.feedback.last_action() if self.feedback else None,
+        }
+
+        # Decisão
+        action = self.strategy.decide(current, world_view, context)
+
+        base_event = {
+            "state": current.name,
+            "world": world_view,
+            "action": action,
+            "mode": self.mode,
+        }
+
+        if not action:
+            self.store.record_event({**base_event, "result": "NO_ACTION"})
+            self._learn_and_adapt()
+            return
+
+        if not self.risk.allow(current, action):
+            self.store.record_event({**base_event, "result": "BLOCKED_BY_RISK"})
+            self._learn_and_adapt()
+            return
+
+        self.store.record_event({**base_event, "result": "APPROVED"})
+
+        # Regra global
+        if current == State.IN_POSITION and action["type"] == "BUY":
+            print("⛔ BUY bloqueado: já existe posição aberta.")
+            self._learn_and_adapt()
+            return
+
+        self.execute(action)
+        self._learn_and_adapt()
+
+    # -------------------------------------------------
+    # EXECUÇÃO
+    # -------------------------------------------------
+    def execute(self, action: dict):
+        kind = action["type"]
+        status = "UNKNOWN"
+
+        try:
+            if kind == "BUY":
+                self.state.set(State.ENTERING)
+                ok = self.broker.buy(action)
+
+                if ok:
+                    self.state.set(State.IN_POSITION)
+                    status = "EXECUTED"
+                    self.risk.on_executed(action)
+                else:
+                    self.state.set(State.ERROR)
+                    status = "FAILED"
+
+                self.persist()
+
+            elif kind == "SELL":
+                self.state.set(State.EXITING)
+                ok = self.broker.sell(action)
+
+                if ok:
+                    self.state.set(State.POST_TRADE)
+                    self.state.set(State.IDLE)
+                    status = "EXECUTED"
+
+                    # Determina resultado lógico
+                    result = action.get("result") or action.get("reason")
+                    if result in ("PROFIT", "WIN"):
+                        self.risk.on_trade_result("WIN")
+                    else:
+                        self.risk.on_trade_result("LOSS")
+
+                    self.risk.on_executed(action)
+
+                else:
+                    self.state.set(State.ERROR)
+                    status = "FAILED"
+
+                self.persist()
+
+        except Exception:
+            status = "ERROR"
+            self.state.set(State.ERROR)
+
+        self.store.record_trade(
+            {
+                "action": action,
+                "status": status,
+                "mode": self.mode,
+                "state": self.state.current().name,
+            }
+        )
+
+        self.persist()
+
+    # -------------------------------------------------
+    # APRENDIZADO CONTÍNUO
+    # -------------------------------------------------
+    def _learn_and_adapt(self):
+        # Aprendizado por histórico
+        if hasattr(self.store, "read_events"):
+            events = self.store.read_events(limit=50)
+            if events:
+                self.strategy.learn(events)
+
+        # Adaptação por diagnóstico
+        if self.feedback:
+            diagnosis = self.feedback.diagnose()
+            if diagnosis:
+                self.strategy.adapt(diagnosis)
+
+    # -------------------------------------------------
+    # PERSISTÊNCIA CENTRAL
+    # -------------------------------------------------
+    def persist(self):
+        snapshot = {
+            "state": self.state.current().name,
+            "world": self.world.export(),
+            "strategy": self.strategy.export(),
+            "mode": self.mode,
+        }
+
+        self.store.save(snapshot)
