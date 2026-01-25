@@ -201,15 +201,16 @@ class Engine:
             self.human_confirmed = True
             self.state.set(State.ENTERING)
 
-    def cancel(self):
+    def cancel(self, reason: str | None = None):
         if self.state.current() == State.AWAIT_CONFIRMATION:
-            # Evento cognitivo: humano negou
+            # Evento cognitivo: humano negou com contexto
             self.store.record_event(
                 {
                     "type": "human_cancelled",
                     "state": self.state.current().name,
                     "mode": self.mode,
                     "action": self.pending_action,
+                    "human_reason": reason,
                 }
             )
 
