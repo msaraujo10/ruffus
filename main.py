@@ -74,10 +74,13 @@ def main():
 
             if engine.state.current().name == "AWAIT_CONFIRMATION":
                 cmd = input("Confirmar [c] / Cancelar [x]: ").strip().lower()
+
                 if cmd == "c":
                     engine.confirm()
+
                 elif cmd == "x":
-                    engine.cancel()
+                    reason = input("Motivo (opcional): ").strip()
+                    engine.cancel(reason or None)
 
             time.sleep(config["sleep"])
 
