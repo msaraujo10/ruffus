@@ -6,7 +6,8 @@ from datetime import datetime
 class FeedbackEngine:
     """
     Lê eventos do sistema (events.jsonl), resume o comportamento recente
-    e produz diagnósticos cognitivos sobre o estado do robô.
+    e produz diagnósticos cognitivos sobre o estado do robô,
+    incluindo agora a relação com o humano.
     """
 
     def __init__(self, events_path: str = "storage/events.jsonl"):
@@ -40,8 +41,13 @@ class FeedbackEngine:
         sells = 0
         blocked = 0
         errors = 0
+        human_confirmed = 0
+        human_cancelled = 0
+        consecutive_cancels = 0
+        max_consecutive_cancels = 0
 
         for e in events:
+            etype = e.get("type")
             result = e.get("result")
             action = e.get("action", {})
 
@@ -54,12 +60,26 @@ class FeedbackEngine:
             elif result in ("FAILED", "ERROR"):
                 errors += 1
 
+            if etype == "human_confirmed":
+                human_confirmed += 1
+                consecutive_cancels = 0
+
+            elif etype == "human_cancelled":
+                human_cancelled += 1
+                consecutive_cancels += 1
+                max_consecutive_cancels = max(
+                    max_consecutive_cancels, consecutive_cancels
+                )
+
         return {
             "events": len(events),
             "buys": buys,
             "sells": sells,
             "blocked": blocked,
             "errors": errors,
+            "human_confirmed": human_confirmed,
+            "human_cancelled": human_cancelled,
+            "max_consecutive_cancels": max_consecutive_cancels,
         }
 
     # -------------------------------------------------
@@ -91,9 +111,21 @@ class FeedbackEngine:
                 problems.append("Ocorreram erros recentes.")
                 recommendations.append("Verificar logs e integridade dos brokers.")
 
-            if summary["buys"] == 0 and summary["events"] > 20:
-                problems.append("Nenhuma entrada executada.")
-                recommendations.append("Ajustar critérios do DecisionEngine.")
+            # ----------------------------
+            # SINAIS HUMANOS
+            # ----------------------------
+            hc = summary["human_confirmed"]
+            hcan = summary["human_cancelled"]
+
+            if hcan > hc and hcan >= 3:
+                signals.append("Humano tem negado mais propostas do que aprovado.")
+                recommendations.append("Reduzir agressividade da estratégia.")
+
+            if summary["max_consecutive_cancels"] >= 3:
+                signals.append("Múltiplas negações humanas consecutivas.")
+                recommendations.append(
+                    "Sistema possivelmente desalinhado com o operador."
+                )
 
         total = summary.get("events", 0) or 1
 
@@ -102,6 +134,7 @@ class FeedbackEngine:
             "buy_ratio": summary.get("buys", 0) / total,
             "sell_ratio": summary.get("sells", 0) / total,
             "error_rate": summary.get("errors", 0) / total,
+            "human_cancel_ratio": summary.get("human_cancelled", 0) / total,
         }
 
         diagnosis = {
@@ -113,41 +146,8 @@ class FeedbackEngine:
             "recommendations": recommendations,
         }
 
-        # Persistência cognitiva
         self.persist_memory(diagnosis)
-
         return diagnosis
-
-    # -------------------------------------------------
-    # CONTRATO COGNITIVO (FASE 18)
-    # -------------------------------------------------
-    def health(self) -> str:
-        """
-        Retorna apenas o estado de saúde atual.
-        """
-        try:
-            diag = self.diagnose()
-            return diag.get("health", "OK")
-        except Exception:
-            return "OK"
-
-    def profile(self):
-        """
-        Retorna informações de perfil cognitivo se existirem.
-        (Reservado para fases futuras.)
-        """
-        return None
-
-    def last_action(self):
-        """
-        Retorna a última ação registrada no sistema.
-        """
-        events = self.read_events(limit=1)
-        if not events:
-            return None
-
-        e = events[-1]
-        return e.get("action")
 
     # -------------------------------------------------
     # MEMÓRIA COGNITIVA
