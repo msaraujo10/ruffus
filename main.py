@@ -72,6 +72,21 @@ def main():
             engine.step(feed)
             panel.render()
 
+            # Comandos cognitivos globais
+            if os.name != "nt":  # evita conflito em alguns terminais
+                pass
+                # Comandos cognitivos globais
+            cmd = None
+            if engine.state.current().name != "AWAIT_CONFIRMATION":
+                try:
+                    cmd = input().strip().lower()
+                except EOFError:
+                    cmd = None
+
+                if cmd in (":normal", ":cautious", ":defensive", ":suspend"):
+                    engine.override_regime(cmd.replace(":", ""))
+                    continue
+
             if engine.state.current().name == "AWAIT_CONFIRMATION":
                 cmd = input("Confirmar [c] / Cancelar [x]: ").strip().lower()
 

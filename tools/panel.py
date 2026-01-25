@@ -25,6 +25,17 @@ class Panel:
         print(f"State: {snap['state']}")
         print(f"Saúde: {snap['health']}")
 
+        regime = snap.get("regime")
+        if regime:
+            print(f"Regime da Estratégia: {regime}")
+
+        human = snap.get("human_profile")
+        if human:
+            print("\n👤 PERFIL HUMANO (inferido)")
+            print("-" * 60)
+            for line in human:
+                print(f"- {line}")
+
     def render_intent(self, snap):
         print("\n🎯 PROPOSTA DO SISTEMA")
         print("-" * 60)
