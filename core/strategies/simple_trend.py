@@ -1,78 +1,97 @@
 from core.state_machine import State
-from .base import BaseStrategy
 
 
-class SimpleTrendStrategy(BaseStrategy):
+class SimpleTrendStrategy:
     """
-    Estratégia simples baseada em tendência.
+    Estratégia simples baseada em tendência,
+    agora com regimes cognitivos reais.
 
-    Agora é consciente do estado cognitivo do sistema:
+    Regimes:
     - NORMAL
+    - CAUTIOUS
     - DEFENSIVE
     - SUSPENDED
     """
 
-    name = "simple_trend"
-
     def __init__(self, config: dict):
         self.config = config
-        self.entries: dict[str, float] = {}
-        self.mode = "NORMAL"
+        self.entries = {}
+        self.regime = "NORMAL"
 
     # ----------------------------
     # ADAPTAÇÃO COGNITIVA
     # ----------------------------
     def adapt(self, diagnosis: dict) -> None:
         health = diagnosis.get("health", "OK")
+        signals = diagnosis.get("signals", [])
 
+        # Regimes fortes
         if health == "RISK_BLOCKED":
-            self.mode = "SUSPENDED"
+            self.regime = "SUSPENDED"
 
         elif health == "UNSTABLE":
-            self.mode = "DEFENSIVE"
+            self.regime = "DEFENSIVE"
+
+        # Influência humana
+        elif any("Humano tem negado" in s for s in signals):
+            self.regime = "CAUTIOUS"
+
+        elif any("Múltiplas negações" in s for s in signals):
+            self.regime = "CAUTIOUS"
 
         else:
-            self.mode = "NORMAL"
+            self.regime = "NORMAL"
 
     # ----------------------------
     # DECISÃO
     # ----------------------------
-    def decide(self, state, world: dict, context: dict | None = None):
-        context = context or {}
+    def decide(self, state, world, context):
         mode = context.get("mode")
 
-        # Consciência de regime
+        # Estados absolutos
+        if self.regime == "SUSPENDED":
+            return None
+
+        if self.regime == "DEFENSIVE" and state == State.IDLE:
+            # Em modo defensivo, não abrimos novas posições
+            return None
+
+        # Respeito a modos externos
         if mode in ("PAUSED", "OBSERVADOR"):
             return None
 
-        prices = world.get("prices", {})
+        prices = world["prices"]
 
-        # Entrada
+        # --------------------
+        # ENTRADA
+        # --------------------
         if state == State.IDLE:
             for symbol, price in prices.items():
                 if price is None:
                     continue
 
-                if self.mode == "DEFENSIVE":
-                    ok = self.should_enter_defensive(symbol, price)
-                elif self.mode == "SUSPENDED":
-                    ok = False
+                if self.regime == "CAUTIOUS":
+                    # Em modo cauteloso, só entra se o "sinal" for forte
+                    if not self.should_enter_strong(symbol, price):
+                        continue
                 else:
-                    ok = self.should_enter(symbol, price)
+                    if not self.should_enter(symbol, price):
+                        continue
 
-                if ok:
-                    self.entries[symbol] = price
-                    return {
-                        "type": "BUY",
-                        "symbol": symbol,
-                        "price": price,
-                    }
+                self.entries[symbol] = price
+                return {
+                    "type": "BUY",
+                    "symbol": symbol,
+                    "price": price,
+                }
 
-        # Saída
+        # --------------------
+        # SAÍDA
+        # --------------------
         if state == State.IN_POSITION:
             for symbol, entry in list(self.entries.items()):
                 price = prices.get(symbol)
-                if price is None:
+                if not price:
                     continue
 
                 change = ((price - entry) / entry) * 100
@@ -99,24 +118,24 @@ class SimpleTrendStrategy(BaseStrategy):
     # HEURÍSTICAS
     # ----------------------------
     def should_enter(self, symbol: str, price: float) -> bool:
+        # Heurística básica atual
         return True
 
-    def should_enter_defensive(self, symbol: str, price: float) -> bool:
-        # Versão conservadora: hoje reutiliza a mesma lógica,
-        # mas no futuro pode exigir volume, candle, etc.
+    def should_enter_strong(self, symbol: str, price: float) -> bool:
+        """
+        Versão mais exigente do sinal.
+        Por enquanto, é igual à normal,
+        mas aqui é onde filtros reais entrarão no futuro.
+        """
         return True
 
     # ----------------------------
-    # CONTRATO CANÔNICO
+    # PERSISTÊNCIA
     # ----------------------------
-    def learn(self, events: list):
-        # Estratégia simples não aprende por enquanto
-        pass
-
     def export(self) -> dict:
         return {
             "entries": dict(self.entries),
-            "mode": self.mode,
+            "regime": self.regime,
         }
 
     def import_state(self, data: dict | None):
@@ -124,4 +143,4 @@ class SimpleTrendStrategy(BaseStrategy):
             return
 
         self.entries = data.get("entries", {})
-        self.mode = data.get("mode", "NORMAL")
+        self.regime = data.get("regime", "NORMAL")

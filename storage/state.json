@@ -2,9 +2,9 @@
     "state": "IN_POSITION",
     "world": {
         "prices": {
-            "BTCUSDT": 86336.1,
-            "ETHUSDT": 2793.92,
-            "SOLUSDT": 117.89
+            "BTCUSDT": 86489.0,
+            "ETHUSDT": 2805.27,
+            "SOLUSDT": 118.43
         }
     },
     "strategy": {
@@ -16,6 +16,6 @@
     "mode": "ASSISTED",
     "meta": {
         "version": "2.0",
-        "last_update": "2026-01-25T20:24:10.851499"
+        "last_update": "2026-01-25T20:29:51.495093"
     }
 }
