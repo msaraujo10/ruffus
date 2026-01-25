@@ -4,18 +4,9 @@ from datetime import datetime
 
 
 class FeedbackEngine:
-    """
-    Lê eventos do sistema (events.jsonl), resume o comportamento recente
-    e produz diagnósticos cognitivos sobre o estado do robô,
-    incluindo agora a relação com o humano.
-    """
-
     def __init__(self, events_path: str = "storage/events.jsonl"):
         self.events_path = events_path
 
-    # -------------------------------------------------
-    # LEITURA DE EVENTOS
-    # -------------------------------------------------
     def read_events(self, limit: int = 100) -> list[dict]:
         if not os.path.exists(self.events_path):
             return []
@@ -23,26 +14,18 @@ class FeedbackEngine:
         events = []
         with open(self.events_path, "r", encoding="utf-8") as f:
             for line in f:
-                line = line.strip()
-                if not line:
-                    continue
                 try:
-                    events.append(json.loads(line))
-                except json.JSONDecodeError:
+                    events.append(json.loads(line.strip()))
+                except Exception:
                     continue
 
         return events[-limit:]
 
-    # -------------------------------------------------
-    # RESUMO
-    # -------------------------------------------------
     def summary(self, events: list[dict]) -> dict:
-        buys = 0
-        sells = 0
-        blocked = 0
-        errors = 0
-        human_confirmed = 0
-        human_cancelled = 0
+        buys = sells = blocked = errors = 0
+        human_confirms = 0
+        human_cancels = 0
+        human_overrides = {}
         consecutive_cancels = 0
         max_consecutive_cancels = 0
 
@@ -60,16 +43,21 @@ class FeedbackEngine:
             elif result in ("FAILED", "ERROR"):
                 errors += 1
 
-            if etype == "human_confirmed":
-                human_confirmed += 1
+            if etype == "human_confirm":
+                human_confirms += 1
                 consecutive_cancels = 0
 
-            elif etype == "human_cancelled":
-                human_cancelled += 1
+            elif etype == "human_cancel":
+                human_cancels += 1
                 consecutive_cancels += 1
                 max_consecutive_cancels = max(
                     max_consecutive_cancels, consecutive_cancels
                 )
+
+            elif etype == "human_override_regime":
+                regime = e.get("regime")
+                if regime:
+                    human_overrides[regime] = human_overrides.get(regime, 0) + 1
 
         return {
             "events": len(events),
@@ -77,14 +65,46 @@ class FeedbackEngine:
             "sells": sells,
             "blocked": blocked,
             "errors": errors,
-            "human_confirmed": human_confirmed,
-            "human_cancelled": human_cancelled,
+            "human_confirms": human_confirms,
+            "human_cancels": human_cancels,
+            "human_overrides": human_overrides,
             "max_consecutive_cancels": max_consecutive_cancels,
         }
 
-    # -------------------------------------------------
-    # DIAGNÓSTICO
-    # -------------------------------------------------
+    def read_journal(self, limit: int = 20):
+        path = "storage/journal.jsonl"
+        if not os.path.exists(path):
+            return []
+
+        entries = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entries.append(json.loads(line))
+                except Exception:
+                    continue
+
+        return entries[-limit:]
+
+    def write_journal(self, diagnosis: dict):
+        try:
+            path = "storage/journal.jsonl"
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+
+            entry = {
+                "ts": datetime.utcnow().isoformat(),
+                "health": diagnosis.get("health"),
+                "summary": diagnosis.get("summary"),
+                "signals": diagnosis.get("signals"),
+                "recommendations": diagnosis.get("recommendations"),
+            }
+
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+        except Exception as e:
+            print(f"[JOURNAL] Falha ao escrever diário: {e}")
+
     def diagnose(self, limit: int = 100) -> dict:
         events = self.read_events(limit)
         summary = self.summary(events)
@@ -98,60 +118,54 @@ class FeedbackEngine:
         if summary["events"] == 0:
             health = "NO_DATA"
             signals.append("Nenhum evento registrado ainda.")
-            recommendations.append("Deixe o sistema rodar por mais tempo.")
         else:
             if summary["blocked"] > summary["buys"]:
                 health = "RISK_BLOCKED"
-                problems.append("Muitas ações bloqueadas pelo RiskManager.")
-                recommendations.append("Revisar configuração de risco.")
-                recommendations.append("Verificar se o sistema está armado.")
 
             if summary["errors"] > 0:
                 health = "UNSTABLE"
-                problems.append("Ocorreram erros recentes.")
-                recommendations.append("Verificar logs e integridade dos brokers.")
 
-            # ----------------------------
-            # SINAIS HUMANOS
-            # ----------------------------
-            hc = summary["human_confirmed"]
-            hcan = summary["human_cancelled"]
+            hc = summary["human_confirms"]
+            hcan = summary["human_cancels"]
 
             if hcan > hc and hcan >= 3:
                 signals.append("Humano tem negado mais propostas do que aprovado.")
-                recommendations.append("Reduzir agressividade da estratégia.")
 
             if summary["max_consecutive_cancels"] >= 3:
                 signals.append("Múltiplas negações humanas consecutivas.")
-                recommendations.append(
-                    "Sistema possivelmente desalinhado com o operador."
-                )
 
-        total = summary.get("events", 0) or 1
+            if summary["human_overrides"]:
+                most = max(summary["human_overrides"].items(), key=lambda x: x[1])[0]
+                signals.append(f"Humano costuma forçar regime: {most}.")
 
-        metrics = {
-            "block_rate": summary.get("blocked", 0) / total,
-            "buy_ratio": summary.get("buys", 0) / total,
-            "sell_ratio": summary.get("sells", 0) / total,
-            "error_rate": summary.get("errors", 0) / total,
-            "human_cancel_ratio": summary.get("human_cancelled", 0) / total,
-        }
+            journal = self.read_journal(limit=10)
+
+            if len(journal) >= 3:
+                last = [e.get("health") for e in journal]
+
+                if last.count("UNSTABLE") == 0:
+                    signals.append("Trajetória recente indica estabilidade crescente.")
+
+                if last[-1] == "OK" and last[0] != "OK":
+                    signals.append("O organismo está se recuperando ao longo do tempo.")
 
         diagnosis = {
             "health": health,
             "summary": summary,
-            "metrics": metrics,
-            "problems": problems,
             "signals": signals,
             "recommendations": recommendations,
         }
 
         self.persist_memory(diagnosis)
+        self.write_journal(diagnosis)
         return diagnosis
 
-    # -------------------------------------------------
-    # MEMÓRIA COGNITIVA
-    # -------------------------------------------------
+    def health(self) -> str:
+        try:
+            return self.diagnose(limit=50).get("health", "OK")
+        except Exception:
+            return "UNSTABLE"
+
     def persist_memory(self, diagnosis: dict) -> None:
         try:
             path = "storage/memory.json"

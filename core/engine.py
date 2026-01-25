@@ -1,3 +1,5 @@
+import json
+import os
 from core.state_machine import State, StateMachine
 
 
@@ -12,6 +14,7 @@ class Engine:
 
         self.initial_mode = mode
         self.mode = mode
+        self.identity = self.load_identity
 
         self.state = StateMachine()
         self.pending_action = None
@@ -27,6 +30,14 @@ class Engine:
             State.ERROR: self.handle_error,
         }
 
+    def load_identity(self):
+        path = "storage/identity.json"
+        if not os.path.exists(path):
+            return None
+
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
     # -------------------------------------------------
     # BOOT
     # -------------------------------------------------
@@ -39,7 +50,7 @@ class Engine:
         if isinstance(raw_state, str):
             try:
                 restored = State[raw_state]
-                if restored != State.BOOT and restored != State.ERROR:
+                if restored not in (State.BOOT, State.ERROR):
                     self.state.set(restored)
             except Exception:
                 self.state.set(State.IDLE)
@@ -59,9 +70,7 @@ class Engine:
             self.mode = self.initial_mode
             print(f"🆕 Modo inicial aplicado: {self.mode}")
 
-        # Sempre sair de BOOT
         if self.state.current() == State.BOOT:
-            print("🟢 Boot concluído. Avançando para IDLE.")
             self.state.set(State.IDLE)
 
         self.persist()
@@ -109,7 +118,6 @@ class Engine:
         context = self._build_context()
 
         action = self.strategy.decide(State.IDLE, world_view, context)
-
         if not action:
             return
 
@@ -150,7 +158,6 @@ class Engine:
         context = self._build_context()
 
         action = self.strategy.decide(State.IN_POSITION, world_view, context)
-
         if not action:
             return
 
@@ -188,25 +195,22 @@ class Engine:
     # -------------------------------------------------
     def confirm(self):
         if self.state.current() == State.AWAIT_CONFIRMATION:
-            # Evento cognitivo: humano aprovou
             self.store.record_event(
                 {
-                    "type": "human_confirmed",
+                    "type": "human_confirm",
                     "state": self.state.current().name,
                     "mode": self.mode,
                     "action": self.pending_action,
                 }
             )
-
             self.human_confirmed = True
             self.state.set(State.ENTERING)
 
     def cancel(self, reason: str | None = None):
         if self.state.current() == State.AWAIT_CONFIRMATION:
-            # Evento cognitivo: humano negou com contexto
             self.store.record_event(
                 {
-                    "type": "human_cancelled",
+                    "type": "human_cancel",
                     "state": self.state.current().name,
                     "mode": self.mode,
                     "action": self.pending_action,
@@ -218,12 +222,23 @@ class Engine:
             self.human_confirmed = False
             self.state.set(State.IDLE)
 
+    def override_regime(self, regime: str):
+        self.store.record_event(
+            {
+                "type": "human_override_regime",
+                "mode": self.mode,
+                "regime": regime,
+            }
+        )
+
+        if hasattr(self.strategy, "regime"):
+            self.strategy.regime = regime.upper()
+
     # -------------------------------------------------
     # SNAPSHOT
     # -------------------------------------------------
     def cognitive_snapshot(self) -> dict:
         intent = None
-
         if self.pending_action:
             intent = {
                 "type": self.pending_action.get("type"),
@@ -232,10 +247,19 @@ class Engine:
                 "reason": self.pending_action.get("reason"),
             }
 
+        regime = getattr(self.strategy, "regime", None)
+
+        diagnosis = self.feedback.diagnose() if self.feedback else {}
+        human_profile = diagnosis.get("signals", [])
+        identity = self.identity or {}
+
         return {
             "mode": self.mode,
+            "identity": identity,
             "state": self.state.current().name,
             "health": self.feedback.health() if self.feedback else None,
+            "regime": regime,
+            "human_profile": human_profile,
             "intent": intent,
             "awaiting_human": self.state.current() == State.AWAIT_CONFIRMATION,
             "last_events": (
