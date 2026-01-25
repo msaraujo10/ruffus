@@ -24,33 +24,32 @@ class Panel:
         print(f"Modo: {snap['mode']}")
         print(f"State: {snap['state']}")
         print(f"Saúde: {snap['health']}")
-        if snap["mode"] == "PAUSED":
-            print("🔴 SISTEMA PAUSADO PELO RISCO")
 
     def render_intent(self, snap):
-        print("\n🎯 INTENÇÃO")
+        print("\n🎯 PROPOSTA DO SISTEMA")
         print("-" * 60)
-        if snap["pending_action"]:
-            print(snap["pending_action"])
-        else:
+
+        intent = snap.get("intent")
+
+        if not intent:
             print("Nenhuma")
+            return
 
-    def render(self):
-        snap = self.engine.cognitive_snapshot()
-        if snap["state"] != "ERROR":
-            self.clear()
-        self.render_header()
-        self.render_state(snap)
-        self.render_intent(snap)
-        self.render_events(snap)
+        print(f"Ação:   {intent.get('type')}")
+        print(f"Ativo:  {intent.get('symbol')}")
+        print(f"Preço: {intent.get('price')}")
 
-        if snap["state"] == "AWAIT_CONFIRMATION":
-            print("\n⏸ Aguardando confirmação humana")
-            print("[C] Confirmar   [X] Cancelar")
+        reason = intent.get("reason")
+        if reason:
+            print(f"Motivo: {reason}")
+
+        if snap.get("awaiting_human"):
+            print("\n⏳ Aguardando confirmação humana...")
 
     def render_events(self, snap):
         print("\n📜 ÚLTIMOS EVENTOS")
         print("-" * 60)
+
         events = snap.get("last_events", [])
         if not events:
             print("Nenhum evento.")
@@ -60,20 +59,11 @@ class Panel:
             tag = e.get("result") or e.get("type")
             print(f"- {tag}")
 
-    def run(self):
-        while True:
-            try:
-                self.clear()
+    def render(self):
+        self.clear()
+        snap = self.engine.cognitive_snapshot()
 
-                snap = self.engine.cognitive_snapshot()
-
-                self.render_header()
-                self.render_state(snap)
-                self.render_intent(snap)
-                self.render_events(snap)
-
-                time.sleep(self.refresh)
-
-            except KeyboardInterrupt:
-                print("\n⏹ Painel encerrado.")
-                break
+        self.render_header()
+        self.render_state(snap)
+        self.render_intent(snap)
+        self.render_events(snap)
