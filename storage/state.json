@@ -1,21 +1,21 @@
 {
-    "state": "ERROR",
+    "state": "IN_POSITION",
     "world": {
         "prices": {
-            "BTCUSDT": 89690.0,
-            "ETHUSDT": 2961.01,
-            "SOLUSDT": 127.63
+            "BTCUSDT": 86336.1,
+            "ETHUSDT": 2793.92,
+            "SOLUSDT": 117.89
         }
     },
     "strategy": {
         "entries": {
-            "BTCUSDT": 89753.1
+            "BTCUSDT": 86426.3
         },
         "mode": "NORMAL"
     },
-    "mode": "OBSERVADOR",
+    "mode": "ASSISTED",
     "meta": {
         "version": "2.0",
-        "last_update": "2026-01-24T06:18:07.805578"
+        "last_update": "2026-01-25T20:24:10.851499"
     }
 }

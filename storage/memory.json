@@ -2,19 +2,19 @@
     "health": "OK",
     "summary": {
         "events": 100,
-        "buys": 21,
-        "sells": 15,
+        "buys": 13,
+        "sells": 6,
         "blocked": 0,
         "errors": 0
     },
     "metrics": {
         "block_rate": 0.0,
-        "buy_ratio": 0.21,
-        "sell_ratio": 0.15,
+        "buy_ratio": 0.13,
+        "sell_ratio": 0.06,
         "error_rate": 0.0
     },
     "problems": [],
     "signals": [],
     "recommendations": [],
-    "updated_at": "2026-01-24T06:18:07.804885"
+    "updated_at": "2026-01-25T20:24:11.488987"
 }
