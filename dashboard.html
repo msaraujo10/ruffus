@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Ruffus — Dashboard Vivo</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #0e0e11;
+            color: #e5e5e5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #7dd3fc;
+        }
+
+        .card {
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            background: #141418;
+        }
+
+        .label {
+            color: #9ca3af;
+        }
+
+        .value {
+            font-weight: bold;
+        }
+
+        pre {
+            background: #0b0b0e;
+            padding: 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        .ok {
+            color: #4ade80;
+        }
+
+        .warn {
+            color: #facc15;
+        }
+
+        .bad {
+            color: #f87171;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🧠 Ruffus — Organismo Vivo</h1>
+
+    <div class="card">
+        <div><span class="label">Modo:</span> <span id="mode" class="value"></span></div>
+        <div><span class="label">Estado:</span> <span id="state" class="value"></span></div>
+        <div><span class="label">Saúde:</span> <span id="health" class="value"></span></div>
+        <div><span class="label">Regime:</span> <span id="regime" class="value"></span></div>
+        <div><span class="label">Aguardando humano:</span> <span id="awaiting" class="value"></span></div>
+    </div>
+
+    <div class="card">
+        <h3>🎯 Intenção</h3>
+        <pre id="intent">—</pre>
+    </div>
+
+    <div class="card">
+        <h3>👤 Perfil Humano</h3>
+        <ul id="human"></ul>
+    </div>
+
+    <div class="card">
+        <h3>📜 Últimos Eventos</h3>
+        <pre id="events">—</pre>
+    </div>
+
+    <script>
+        function healthClass(h) {
+            if (h === "OK") return "ok";
+            if (h === "UNSTABLE") return "warn";
+            return "bad";
+        }
+
+        async function refresh() {
+            try {
+                const r = await fetch("http://127.0.0.1:8000/snapshot");
+                const d = await r.json();
+
+                document.getElementById("mode").textContent = d.mode;
+                document.getElementById("state").textContent = d.state;
+
+                const h = document.getElementById("health");
+                h.textContent = d.health;
+                h.className = "value " + healthClass(d.health);
+
+                document.getElementById("regime").textContent = d.regime || "—";
+                document.getElementById("awaiting").textContent = d.awaiting_human ? "SIM" : "NÃO";
+
+                document.getElementById("intent").textContent =
+                    d.intent ? JSON.stringify(d.intent, null, 2) : "—";
+
+                const human = document.getElementById("human");
+                human.innerHTML = "";
+                (d.human_profile || []).forEach(line => {
+                    const li = document.createElement("li");
+                    li.textContent = line;
+                    human.appendChild(li);
+                });
+
+                document.getElementById("events").textContent =
+                    JSON.stringify(d.last_events || [], null, 2);
+
+            } catch (e) {
+                console.error("Erro ao ler snapshot:", e);
+            }
+        }
+
+        setInterval(refresh, 1000);
+        refresh();
+    </script>
+</body>
+
+</html>

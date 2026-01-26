@@ -125,7 +125,11 @@ class Engine:
             return
 
         self.pending_action = action
-        self.state.set(State.ENTERING)
+
+        if self.mode == "ASSISTED":
+            self.state.set(State.AWAIT_CONFIRMATION)
+        else:
+            self.state.set(State.ENTERING)
 
     def handle_entering(self):
         action = self.pending_action

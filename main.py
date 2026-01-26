@@ -2,6 +2,7 @@ import time
 import os
 import json
 
+
 from core.engine import Engine
 from core.risk import RiskManager
 from core.world import World
@@ -11,6 +12,7 @@ from core.strategies.registry import load_strategy
 from tools.feedback import FeedbackEngine
 from tools.memory import CognitiveMemory
 from tools.panel import Panel
+
 
 from adapters.virtual import VirtualBroker
 from adapters.bybit import BybitBroker
@@ -30,7 +32,15 @@ def main():
         "stop_loss": -0.5,
         "take_profit": 1.2,
         "sleep": 1,
-        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+        "symbols": [
+            "ETHUSDT",
+            "SOLUSDT",
+            "BNBUSDT",
+            "XRPUSDT",
+            "ADAUSDT",
+            "AVAXUSDT",
+            "LINKUSDT",
+        ],
         "store_path": "storage/state.json",
         "armed": True,
         "strategy": "simple_trend",
@@ -63,6 +73,17 @@ def main():
     )
 
     engine.boot()
+    from tools import web
+
+    web.engine_ref = engine
+
+    import threading
+    import uvicorn
+
+    def run_web():
+        uvicorn.run(web.app, host="127.0.0.1", port=8000, log_level="error")
+
+    threading.Thread(target=run_web, daemon=True).start()
 
     panel = Panel(engine)
 
