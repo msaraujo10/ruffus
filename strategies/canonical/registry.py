@@ -1,5 +1,5 @@
-from core.strategies.simple_trend import SimpleTrendStrategy
-from core.strategies.always_buy import AlwaysBuyStrategy
+from strategies.canonical.simple_trend import SimpleTrendStrategy
+from strategies.canonical.always_buy import AlwaysBuyStrategy
 
 
 STRATEGIES = {

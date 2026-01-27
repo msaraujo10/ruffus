@@ -1,19 +1,19 @@
 {
-    "health": "OK",
+    "health": "NO_DATA",
     "summary": {
-        "events": 1,
+        "events": 0,
         "buys": 0,
         "sells": 0,
         "blocked": 0,
         "errors": 0,
-        "human_confirms": 1,
+        "human_confirms": 0,
         "human_cancels": 0,
         "human_overrides": {},
         "max_consecutive_cancels": 0
     },
     "signals": [
-        "Trajetória recente indica estabilidade crescente."
+        "Nenhum evento registrado ainda."
     ],
     "recommendations": [],
-    "updated_at": "2026-01-26T22:39:44.746644"
+    "updated_at": "2026-01-27T02:26:01.063338"
 }
