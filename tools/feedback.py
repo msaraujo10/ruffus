@@ -4,8 +4,20 @@ from datetime import datetime
 
 
 class FeedbackEngine:
-    def __init__(self, events_path: str = "storage/events.jsonl"):
+    def __init__(
+        self,
+        events_path: str = "storage/events.jsonl",
+        memory_path: str = "storage/memory.json",
+        journal_path: str = "storage/journal.jsonl",
+    ):
         self.events_path = events_path
+        self.memory_path = memory_path
+        self.journal_path = journal_path
+
+    def log(self, event: dict):
+        os.makedirs(os.path.dirname(self.events_path), exist_ok=True)
+        with open(self.events_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(event, ensure_ascii=False) + "\n")
 
     def read_events(self, limit: int = 100) -> list[dict]:
         if not os.path.exists(self.events_path):
@@ -72,7 +84,7 @@ class FeedbackEngine:
         }
 
     def read_journal(self, limit: int = 20):
-        path = "storage/journal.jsonl"
+        path = self.journal_path
         if not os.path.exists(path):
             return []
 
@@ -88,7 +100,7 @@ class FeedbackEngine:
 
     def write_journal(self, diagnosis: dict):
         try:
-            path = "storage/journal.jsonl"
+            path = self.journal_path
             os.makedirs(os.path.dirname(path), exist_ok=True)
 
             entry = {
@@ -109,7 +121,6 @@ class FeedbackEngine:
         events = self.read_events(limit)
         summary = self.summary(events)
 
-        problems = []
         signals = []
         recommendations = []
 
@@ -125,30 +136,6 @@ class FeedbackEngine:
             if summary["errors"] > 0:
                 health = "UNSTABLE"
 
-            hc = summary["human_confirms"]
-            hcan = summary["human_cancels"]
-
-            if hcan > hc and hcan >= 3:
-                signals.append("Humano tem negado mais propostas do que aprovado.")
-
-            if summary["max_consecutive_cancels"] >= 3:
-                signals.append("Múltiplas negações humanas consecutivas.")
-
-            if summary["human_overrides"]:
-                most = max(summary["human_overrides"].items(), key=lambda x: x[1])[0]
-                signals.append(f"Humano costuma forçar regime: {most}.")
-
-            journal = self.read_journal(limit=10)
-
-            if len(journal) >= 3:
-                last = [e.get("health") for e in journal]
-
-                if last.count("UNSTABLE") == 0:
-                    signals.append("Trajetória recente indica estabilidade crescente.")
-
-                if last[-1] == "OK" and last[0] != "OK":
-                    signals.append("O organismo está se recuperando ao longo do tempo.")
-
         diagnosis = {
             "health": health,
             "summary": summary,
@@ -160,15 +147,9 @@ class FeedbackEngine:
         self.write_journal(diagnosis)
         return diagnosis
 
-    def health(self) -> str:
-        try:
-            return self.diagnose(limit=50).get("health", "OK")
-        except Exception:
-            return "UNSTABLE"
-
     def persist_memory(self, diagnosis: dict) -> None:
         try:
-            path = "storage/memory.json"
+            path = self.memory_path
             os.makedirs(os.path.dirname(path), exist_ok=True)
 
             payload = dict(diagnosis)
@@ -179,3 +160,9 @@ class FeedbackEngine:
 
         except Exception as e:
             print(f"[MEMORY] Falha ao persistir memória: {e}")
+
+    def health(self) -> str:
+        try:
+            return self.diagnose(limit=50).get("health", "OK")
+        except Exception:
+            return "UNSTABLE"

@@ -7,7 +7,7 @@ from core.engine import Engine
 from core.risk import RiskManager
 from core.world import World
 from core.profiles.registry import load_profile
-from core.strategies.registry import load_strategy
+from strategies.canonical.registry import load_strategy
 
 from tools.feedback import FeedbackEngine
 from tools.memory import CognitiveMemory

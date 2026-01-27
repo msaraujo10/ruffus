@@ -13,6 +13,21 @@ class CognitiveMemory:
         with open(self.path, "r", encoding="utf-8") as f:
             return json.load(f)
 
+    def save(self, data: dict):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+    def observe(self, event: dict):
+        """
+        Registra uma experiência cognitiva.
+        Usado pelo Ruffus-Binary para criar passado próprio.
+        """
+        data = self.load() or {}
+        history = data.setdefault("history", [])
+        history.append(event)
+        self.save(data)
+
     def recomendations(self) -> list[str]:
         data = self.load()
         if not data:
@@ -26,14 +41,6 @@ class CognitiveMemory:
         return data.get("health", "UNKNOWN")
 
     def profile(self) -> str:
-        """
-        Retorna um perfil cognitivo do sistema:
-        - "PAUSED"
-        - "CONSERVATIVE"
-        - "NORMAL"
-        - "AGGRESSIVE"
-        """
-
         data = self.load()
 
         if not data:
@@ -46,15 +53,12 @@ class CognitiveMemory:
         blocked = summary.get("blocked", 0)
         approved = summary.get("approved", 0)
 
-        # Estado crítico: sistema travado por risco
         if health == "RISK_BLOCKED":
             return "PAUSED"
 
-        # Muito bloqueio em relação ao total → conservador
         if total > 0 and blocked / total > 0.6:
             return "CONSERVATIVE"
 
-        # Muitas execuções reais → agressivo
         if approved >= 10 and blocked < approved:
             return "AGGRESSIVE"
 

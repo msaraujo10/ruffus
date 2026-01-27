@@ -2,24 +2,24 @@
     "state": "IN_POSITION",
     "world": {
         "prices": {
-            "ETHUSDT": 2925.13,
-            "SOLUSDT": 124.71,
-            "BNBUSDT": 877.5,
-            "XRPUSDT": 1.8988,
-            "ADAUSDT": 0.353,
-            "AVAXUSDT": 11.75,
-            "LINKUSDT": 11.99
+            "ETHUSDT": 2942.31,
+            "SOLUSDT": 124.85,
+            "BNBUSDT": 882.3,
+            "XRPUSDT": 1.9129,
+            "ADAUSDT": 0.3552,
+            "AVAXUSDT": 11.83,
+            "LINKUSDT": 12.04
         }
     },
     "strategy": {
         "entries": {
-            "ETHUSDT": 2925.34
+            "ETHUSDT": 2942.17
         },
         "regime": "NORMAL"
     },
     "mode": "ASSISTED",
     "meta": {
         "version": "2.0",
-        "last_update": "2026-01-26T22:14:21.375820"
+        "last_update": "2026-01-27T02:06:16.931624"
     }
 }
