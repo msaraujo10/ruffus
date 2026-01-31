@@ -50,9 +50,13 @@ def main():
     # ------------------------------------------------------------------
     # Órgãos cognitivos próprios
     # ------------------------------------------------------------------
-    memory = CognitiveMemory(binary_config["memory_path"])
-    store = JSONStore(binary_config["store_path"])
-    feedback = FeedbackEngine(binary_config["events_path"])
+    memory = CognitiveMemory("storage/binary/memory.json")
+    store = JSONStore("storage/binary/state.json")
+    feedback = FeedbackEngine(
+        events_path="storage/binary/events.jsonl",
+        memory_path="storage/binary/memory.json",
+        journal_path="storage/binary/journal.jsonl",
+    )
 
     world = World(binary_config["symbols"], store)
     strategy = load_binary_strategies("impulse", binary_config)
@@ -100,101 +104,14 @@ def main():
     while True:
         try:
             feed = broker.tick()
+
+            # Nenhum evento real → nenhum pensamento
+            if feed is None:
+                time.sleep(1)
+                continue
+
             engine.step(feed)
-
-            # --------------------------------------------------
-            # Fecha o ciclo cognitivo binário (aprendizado)
-            # --------------------------------------------------
-            if hasattr(broker, "events") and broker.events:
-                while broker.events:
-                    evt = broker.events.pop(0)
-
-                    if evt.get("type") == "binary_result":
-                        diagnosis = {
-                            "pattern": evt.get("pattern"),
-                            "result": evt.get("result"),
-                            "symbol": evt.get("symbol"),
-                            "zone": evt.get("zone"),
-                            "tempo": evt.get("tempo"),
-                        }
-
-                        # 1. A mente binária aprende
-                        engine.strategy.adapt(diagnosis)
-
-                        # 2. O evento é registrado na história da espécie
-                        feedback.log(
-                            {
-                                "type": "binary_result",
-                                **diagnosis,
-                            }
-                        )
-
-                        # 3. A memória cognitiva absorve a experiência
-                        memory.observe(
-                            {
-                                "kind": "binary_outcome",
-                                "pattern": diagnosis["pattern"],
-                                "zone": diagnosis["zone"],
-                                "tempo": diagnosis["tempo"],
-                                "result": diagnosis["result"],
-                            }
-                        )
-
             panel.render()
-
-            # --------------------------------------------------
-            # Overlay Cognitivo Binário (mente + raciocínio)
-            # --------------------------------------------------
-            strategy = engine.strategy
-            if hasattr(strategy, "export"):
-                data = strategy.export()
-                stats = data.get("stats", {})
-                threshold = data.get("threshold")
-
-                print("\n🧠 MENTE BINÁRIA")
-                print("-" * 60)
-
-                if not stats:
-                    print("Nenhum padrão observado ainda.")
-                else:
-                    for pattern, s in stats.items():
-                        win = s.get("win", 0)
-                        loss = s.get("loss", 0)
-                        total = win + loss
-                        winrate = (win / total * 100) if total > 0 else 0
-
-                        print(
-                            f"{pattern:25}  "
-                            f"WIN: {win:3}  "
-                            f"LOSS: {loss:3}  "
-                            f"WR: {winrate:5.1f}%"
-                        )
-
-                print(f"\nThreshold atual: {threshold}")
-
-            # --------------------------------------------------
-            # Mostra o raciocínio da proposta (se houver)
-            # --------------------------------------------------
-            pa = engine.pending_action
-            if pa:
-                meta = pa.get("meta", {})
-                reason = meta.get("reason")
-
-                if reason:
-                    print("\n🧠 RACIOCÍNIO DA PROPOSTA")
-                    print("-" * 60)
-                    print(f"Zona macro:     {reason.get('zone')}")
-                    print(f"Micro-trend:    {reason.get('micro_trend')}")
-                    print(f"Janela:         {reason.get('window')}")
-                    print(f"Threshold atual:{reason.get('threshold')}")
-
-            if engine.state.current().name == "AWAIT_CONFIRMATION":
-                cmd = input("Confirmar [c] / Cancelar [x]: ").strip().lower()
-                if cmd == "c":
-                    engine.confirm()
-                elif cmd == "x":
-                    reason = input("Motivo (opcional): ").strip()
-                    engine.cancel(reason or None)
 
             time.sleep(binary_config["sleep"])
 

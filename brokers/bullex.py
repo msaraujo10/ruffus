@@ -1,6 +1,5 @@
 import time
 import random
-
 from brokers.bullex_api import BullexAPI
 
 
@@ -14,21 +13,27 @@ class BullexBroker:
         self.contracts = []
         self.events = []
 
-        # Estado cognitivo por símbolo
+        # Mundo cognitivo por símbolo
         self._world = {
             s: {
                 "window": [],
                 "pulse": 0,
                 "micro_trend": 0,
+                "prev_trend": 0,
+                "last_price": None,
+                # Macro
+                "macro_ref": None,
                 "macro_pos": 50.0,
                 "zone": "middle",
-                "last_price": None,
+                # Tempo
+                "last_5m_ts": None,
+                "last_4h_ts": None,
             }
             for s in symbols
         }
 
     # --------------------------------------------------
-    # TRADUÇÃO COGNITIVA
+    # MICRO (5M)
     # --------------------------------------------------
     def _update_micro(self, bw, price):
         last = bw["last_price"]
@@ -36,6 +41,8 @@ class BullexBroker:
         if last is None:
             bw["last_price"] = price
             return
+
+        bw["prev_trend"] = bw["micro_trend"]
 
         delta = price - last
         pulse = 1 if delta > 0 else -1
@@ -48,13 +55,24 @@ class BullexBroker:
         bw["micro_trend"] = sum(bw["window"])
         bw["last_price"] = price
 
-    def _update_macro(self, bw):
-        """
-        Por enquanto ainda sintético.
-        Depois virá do 4H real.
-        """
-        bw["macro_pos"] += random.uniform(-1.0, 1.0)
+    # --------------------------------------------------
+    # MACRO (4H)
+    # --------------------------------------------------
+    def _update_macro(self, bw, symbol):
+        candle = self.api.get_last_candle(symbol, timeframe="4h")
+        price = candle["close"]
+
+        ref = bw["macro_ref"]
+        if ref is None:
+            bw["macro_ref"] = price
+            bw["macro_pos"] = 50.0
+            bw["zone"] = "middle"
+            return
+
+        delta = price - ref
+        bw["macro_pos"] += delta * 10
         bw["macro_pos"] = max(0, min(100, bw["macro_pos"]))
+        bw["macro_ref"] = price
 
         if bw["macro_pos"] < 30:
             bw["zone"] = "bottom"
@@ -64,14 +82,21 @@ class BullexBroker:
             bw["zone"] = "middle"
 
     # --------------------------------------------------
-    # TICK PRINCIPAL
+    # TICK — TEMPO BINÁRIO SEMÂNTICO
     # --------------------------------------------------
     def tick(self):
         now = time.time()
 
-        # --------------------------------------------------
-        # 1. Resolve contratos expirados
-        # --------------------------------------------------
+        changed = False
+        micro_updated = False
+        macro_updated = False
+        contract_resolved = False
+
+        feed = {}
+
+        # ----------------------------------------------
+        # 1. Contratos expirados (EVENTO REAL)
+        # ----------------------------------------------
         for c in self.contracts:
             if c.resolved:
                 continue
@@ -79,6 +104,8 @@ class BullexBroker:
             if now >= c.expiry_at:
                 c.resolved = True
                 c.result = random.choice(["WIN", "LOSS"])
+                contract_resolved = True
+                changed = True
 
                 self.events.append(
                     {
@@ -93,37 +120,67 @@ class BullexBroker:
                     }
                 )
 
-        # --------------------------------------------------
-        # 2. Gera mundo cognitivo
-        # --------------------------------------------------
-        feed = {}
-
+        # ----------------------------------------------
+        # 2. Candles (EVENTO REAL)
+        # ----------------------------------------------
         for symbol in self.symbols:
             bw = self._world[symbol]
 
-            # Futuro real:
-            # candle = self.api.get_last_candle(symbol, timeframe="5m")
-            # price = candle["close"]
+            # ----- 5M
+            candle_5m = self.api.get_last_candle(symbol, timeframe="5m")
+            ts5 = candle_5m["ts"]
 
-            # Simulação atual
-            price = bw["last_price"] or random.uniform(1.0, 2.0)
-            price += random.uniform(-0.001, 0.001)
+            if bw["last_5m_ts"] != ts5:
+                bw["last_5m_ts"] = ts5
+                self._update_micro(bw, candle_5m["close"])
+                micro_updated = True
+                changed = True
 
-            self._update_micro(bw, price)
-            self._update_macro(bw)
+            # ----- 4H
+            candle_4h = self.api.get_last_candle(symbol, timeframe="4h")
+            ts4 = candle_4h["ts"]
+
+            if bw["last_4h_ts"] != ts4:
+                bw["last_4h_ts"] = ts4
+                self._update_macro(bw, symbol)
+                macro_updated = True
+                changed = True
 
             feed[symbol] = {
-                "price": price,
+                "price": bw["last_price"],
                 "binary": {
                     "pulse": bw["pulse"],
                     "window": list(bw["window"]),
                     "micro_trend": bw["micro_trend"],
+                    "prev_trend": bw["prev_trend"],
                 },
                 "macro": {
                     "zone": bw["zone"],
                     "pos": round(bw["macro_pos"], 2),
                 },
             }
+
+        # ----------------------------------------------
+        # 3. Sem evento → sem pensamento
+        # ----------------------------------------------
+        if not changed:
+            return None
+
+        # ----------------------------------------------
+        # 4. Evento temporal semântico
+        # ----------------------------------------------
+        event_meta = {"time_event": []}
+
+        if micro_updated:
+            event_meta["time_event"].append("5M_CLOSED")
+
+        if macro_updated:
+            event_meta["time_event"].append("4H_CLOSED")
+
+        if contract_resolved:
+            event_meta["time_event"].append("CONTRACT_EXPIRED")
+
+        feed["_event"] = event_meta
 
         return feed
 
@@ -140,9 +197,6 @@ class BullexBroker:
             action.get("meta", {}).get("expiry", 60),
         )
 
-        if not ok:
-            return False
-
         contract = type("Contract", (), {})()
         contract.id = str(uuid.uuid4())
         contract.symbol = action["symbol"]
@@ -158,4 +212,5 @@ class BullexBroker:
         contract.tempo = ctx.get("tempo")
 
         self.contracts.append(contract)
+
         return True

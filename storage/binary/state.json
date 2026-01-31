@@ -3,241 +3,167 @@
     "world": {
         "prices": {
             "AUDCAD": {
-                "price": 1.9414694416611182,
+                "price": 1.93341,
                 "binary": {
-                    "pulse": -1,
-                    "window": [
-                        -1,
-                        1,
-                        -1,
-                        1,
-                        -1,
-                        -1
-                    ],
-                    "micro_trend": -2
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 52.24
+                    "pos": 50.0
                 }
             },
             "AUDJPY": {
-                "price": 1.8641743910802728,
+                "price": 1.44691,
                 "binary": {
-                    "pulse": 1,
-                    "window": [
-                        1,
-                        -1,
-                        -1,
-                        -1,
-                        1,
-                        1
-                    ],
-                    "micro_trend": 0
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 46.65
+                    "pos": 50.0
                 }
             },
             "AUDUSD": {
-                "price": 1.4389204868501124,
+                "price": 1.9644,
                 "binary": {
-                    "pulse": -1,
-                    "window": [
-                        -1,
-                        1,
-                        -1,
-                        -1,
-                        1,
-                        -1
-                    ],
-                    "micro_trend": -2
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 58.3
+                    "pos": 50.0
                 }
             },
             "CADJPY": {
-                "price": 0.9857945650519133,
+                "price": 1.32447,
                 "binary": {
-                    "pulse": 1,
-                    "window": [
-                        -1,
-                        1,
-                        1,
-                        1,
-                        -1,
-                        1
-                    ],
-                    "micro_trend": 2
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 49.22
+                    "pos": 50.0
                 }
             },
             "EURGBP": {
-                "price": 1.4850719883697168,
+                "price": 1.95897,
                 "binary": {
-                    "pulse": 1,
-                    "window": [
-                        -1,
-                        1,
-                        -1,
-                        1,
-                        1,
-                        1
-                    ],
-                    "micro_trend": 2
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 35.63
+                    "pos": 50.0
                 }
             },
             "EURCAD": {
-                "price": 1.2643321868902646,
+                "price": 1.17597,
                 "binary": {
-                    "pulse": -1,
-                    "window": [
-                        -1,
-                        1,
-                        -1,
-                        -1,
-                        -1,
-                        -1
-                    ],
-                    "micro_trend": -4
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 50.74
+                    "pos": 50.0
                 }
             },
             "EURJPY": {
-                "price": 1.8145686149697375,
+                "price": 1.51017,
                 "binary": {
-                    "pulse": -1,
-                    "window": [
-                        1,
-                        -1,
-                        1,
-                        -1,
-                        1,
-                        -1
-                    ],
-                    "micro_trend": 0
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 47.7
+                    "pos": 50.0
                 }
             },
             "EURUSD": {
-                "price": 1.1357975860654963,
+                "price": 1.30116,
                 "binary": {
-                    "pulse": 1,
-                    "window": [
-                        -1,
-                        -1,
-                        1,
-                        -1,
-                        -1,
-                        1
-                    ],
-                    "micro_trend": -2
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 46.99
+                    "pos": 50.0
                 }
             },
             "GBPUSD": {
-                "price": 1.3173904941071295,
+                "price": 1.01304,
                 "binary": {
-                    "pulse": -1,
-                    "window": [
-                        1,
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        -1
-                    ],
-                    "micro_trend": -4
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 51.39
+                    "pos": 50.0
                 }
             },
             "GBPJPY": {
-                "price": 1.1477721680122812,
+                "price": 1.67792,
                 "binary": {
-                    "pulse": -1,
-                    "window": [
-                        -1,
-                        -1,
-                        -1,
-                        -1,
-                        1,
-                        -1
-                    ],
-                    "micro_trend": -4
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 60.2
+                    "pos": 50.0
                 }
             },
             "USDCAD": {
-                "price": 1.4807592135549885,
+                "price": 1.00128,
                 "binary": {
-                    "pulse": 1,
-                    "window": [
-                        -1,
-                        1,
-                        -1,
-                        1,
-                        -1,
-                        1
-                    ],
-                    "micro_trend": 0
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 42.54
+                    "pos": 50.0
                 }
             },
             "USDJPY": {
-                "price": 1.753302471427178,
+                "price": 1.37561,
                 "binary": {
-                    "pulse": -1,
-                    "window": [
-                        -1,
-                        1,
-                        -1,
-                        1,
-                        -1,
-                        -1
-                    ],
-                    "micro_trend": -2
+                    "pulse": 0,
+                    "window": [],
+                    "micro_trend": 0,
+                    "prev_trend": 0
                 },
                 "macro": {
                     "zone": "middle",
-                    "pos": 48.43
+                    "pos": 50.0
                 }
             }
         }
     },
-    "strategy": {
-        "base_threshold": 2,
-        "context_stats": {}
-    },
+    "strategy": {},
     "mode": "ASSISTED",
     "meta": {
         "version": "2.0",
-        "last_update": "2026-01-27T02:26:02.070574"
-    
+        "last_update": "2026-01-31T02:22:16.374312"
+    }
+}

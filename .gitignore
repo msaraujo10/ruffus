@@ -1,0 +1,28 @@
+# =========================
+# Credenciais e segredos
+# =========================
+.env
+*.env
+*.key
+*.secret
+
+# =========================
+# Estado vivo do Ruffus
+# =========================
+storage/state.json
+storage/events.jsonl
+storage/memory.json
+
+# =========================
+# Ambiente Python
+# =========================
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# =========================
+# IDEs
+# =========================
+.vscode/
+.idea/

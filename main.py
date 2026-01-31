@@ -24,7 +24,15 @@ MODE = "ASSISTED"
 def main():
     print(f"🧠 RUFFUS — V2 ESTÁVEL ({MODE})")
 
-    memory = CognitiveMemory()
+    os.makedirs("storage", exist_ok=True)
+
+    memory = CognitiveMemory("storage/memory.json")
+
+    feedback = FeedbackEngine(
+        events_path="storage/events.jsonl",
+        memory_path="storage/memory.json",
+        journal_path="storage/journal.jsonl",
+    )
     health = memory.health()
 
     config = {
@@ -60,7 +68,7 @@ def main():
     world = World(config["symbols"], store)
     strategy = load_strategy(config["strategy"], config)
     risk = RiskManager(config)
-    feedback = FeedbackEngine("storage/events.jsonl")
+    # NÃO recriar feedback aqui
 
     engine = Engine(
         broker=broker,
@@ -92,31 +100,6 @@ def main():
             feed = broker.tick()
             engine.step(feed)
             panel.render()
-
-            # Comandos cognitivos globais
-            if os.name != "nt":  # evita conflito em alguns terminais
-                pass
-                # Comandos cognitivos globais
-            cmd = None
-            if engine.state.current().name != "AWAIT_CONFIRMATION":
-                try:
-                    cmd = input().strip().lower()
-                except EOFError:
-                    cmd = None
-
-                if cmd in (":normal", ":cautious", ":defensive", ":suspend"):
-                    engine.override_regime(cmd.replace(":", ""))
-                    continue
-
-            if engine.state.current().name == "AWAIT_CONFIRMATION":
-                cmd = input("Confirmar [c] / Cancelar [x]: ").strip().lower()
-
-                if cmd == "c":
-                    engine.confirm()
-
-                elif cmd == "x":
-                    reason = input("Motivo (opcional): ").strip()
-                    engine.cancel(reason or None)
 
             time.sleep(config["sleep"])
 

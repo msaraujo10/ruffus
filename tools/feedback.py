@@ -4,20 +4,28 @@ from datetime import datetime
 
 
 class FeedbackEngine:
-    def __init__(
-        self,
-        events_path: str = "storage/events.jsonl",
-        memory_path: str = "storage/memory.json",
-        journal_path: str = "storage/journal.jsonl",
-    ):
+
+    def __init__(self, events_path: str, memory_path: str, journal_path: str):
         self.events_path = events_path
         self.memory_path = memory_path
         self.journal_path = journal_path
 
+        # Garante que todos os órgãos existam fisicamente
+        for path in (self.events_path, self.memory_path, self.journal_path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            if not os.path.exists(path):
+                open(path, "a", encoding="utf-8").close()
+
+    # --------------------------------------------------
+    # Eventos
+    # --------------------------------------------------
     def log(self, event: dict):
-        os.makedirs(os.path.dirname(self.events_path), exist_ok=True)
-        with open(self.events_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        try:
+            os.makedirs(os.path.dirname(self.events_path), exist_ok=True)
+            with open(self.events_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        except Exception as e:
+            print(f"[EVENTS] Falha ao registrar evento: {e}")
 
     def read_events(self, limit: int = 100) -> list[dict]:
         if not os.path.exists(self.events_path):
@@ -33,6 +41,44 @@ class FeedbackEngine:
 
         return events[-limit:]
 
+    # --------------------------------------------------
+    # Diário cognitivo
+    # --------------------------------------------------
+    def read_journal(self, limit: int = 20):
+        if not os.path.exists(self.journal_path):
+            return []
+
+        entries = []
+        with open(self.journal_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entries.append(json.loads(line))
+                except Exception:
+                    continue
+
+        return entries[-limit:]
+
+    def write_journal(self, diagnosis: dict):
+        try:
+            os.makedirs(os.path.dirname(self.journal_path), exist_ok=True)
+
+            entry = {
+                "ts": datetime.utcnow().isoformat(),
+                "health": diagnosis.get("health"),
+                "summary": diagnosis.get("summary"),
+                "signals": diagnosis.get("signals"),
+                "recommendations": diagnosis.get("recommendations"),
+            }
+
+            with open(self.journal_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+        except Exception as e:
+            print(f"[JOURNAL] Falha ao escrever diário: {e}")
+
+    # --------------------------------------------------
+    # Diagnóstico
+    # --------------------------------------------------
     def summary(self, events: list[dict]) -> dict:
         buys = sells = blocked = errors = 0
         human_confirms = 0
@@ -83,40 +129,6 @@ class FeedbackEngine:
             "max_consecutive_cancels": max_consecutive_cancels,
         }
 
-    def read_journal(self, limit: int = 20):
-        path = self.journal_path
-        if not os.path.exists(path):
-            return []
-
-        entries = []
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    entries.append(json.loads(line))
-                except Exception:
-                    continue
-
-        return entries[-limit:]
-
-    def write_journal(self, diagnosis: dict):
-        try:
-            path = self.journal_path
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-
-            entry = {
-                "ts": datetime.utcnow().isoformat(),
-                "health": diagnosis.get("health"),
-                "summary": diagnosis.get("summary"),
-                "signals": diagnosis.get("signals"),
-                "recommendations": diagnosis.get("recommendations"),
-            }
-
-            with open(path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-        except Exception as e:
-            print(f"[JOURNAL] Falha ao escrever diário: {e}")
-
     def diagnose(self, limit: int = 100) -> dict:
         events = self.read_events(limit)
         summary = self.summary(events)
@@ -136,6 +148,30 @@ class FeedbackEngine:
             if summary["errors"] > 0:
                 health = "UNSTABLE"
 
+            hc = summary["human_confirms"]
+            hcan = summary["human_cancels"]
+
+            if hcan > hc and hcan >= 3:
+                signals.append("Humano tem negado mais propostas do que aprovado.")
+
+            if summary["max_consecutive_cancels"] >= 3:
+                signals.append("Múltiplas negações humanas consecutivas.")
+
+            if summary["human_overrides"]:
+                most = max(summary["human_overrides"].items(), key=lambda x: x[1])[0]
+                signals.append(f"Humano costuma forçar regime: {most}.")
+
+            journal = self.read_journal(limit=10)
+
+            if len(journal) >= 3:
+                last = [e.get("health") for e in journal]
+
+                if last.count("UNSTABLE") == 0:
+                    signals.append("Trajetória recente indica estabilidade crescente.")
+
+                if last[-1] == "OK" and last[0] != "OK":
+                    signals.append("O organismo está se recuperando ao longo do tempo.")
+
         diagnosis = {
             "health": health,
             "summary": summary,
@@ -147,22 +183,24 @@ class FeedbackEngine:
         self.write_journal(diagnosis)
         return diagnosis
 
-    def persist_memory(self, diagnosis: dict) -> None:
-        try:
-            path = self.memory_path
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-
-            payload = dict(diagnosis)
-            payload["updated_at"] = datetime.utcnow().isoformat()
-
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=4, ensure_ascii=False)
-
-        except Exception as e:
-            print(f"[MEMORY] Falha ao persistir memória: {e}")
-
     def health(self) -> str:
         try:
             return self.diagnose(limit=50).get("health", "OK")
         except Exception:
             return "UNSTABLE"
+
+    # --------------------------------------------------
+    # Memória cognitiva
+    # --------------------------------------------------
+    def persist_memory(self, diagnosis: dict) -> None:
+        try:
+            os.makedirs(os.path.dirname(self.memory_path), exist_ok=True)
+
+            payload = dict(diagnosis)
+            payload["updated_at"] = datetime.utcnow().isoformat()
+
+            with open(self.memory_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=4, ensure_ascii=False)
+
+        except Exception as e:
+            print(f"[MEMORY] Falha ao persistir memória: {e}")
