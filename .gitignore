@@ -11,7 +11,12 @@
 # =========================
 storage/state.json
 storage/events.jsonl
+storage/journal.jsonl
 storage/memory.json
+storage/binary/state.json
+storage/binary/events.jsonl
+storage/binary/journal.jsonl
+storage/binary/memory.json
 
 # =========================
 # Ambiente Python
